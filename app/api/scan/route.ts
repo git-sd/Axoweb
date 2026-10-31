@@ -1,6 +1,7 @@
 import { TinyFish } from "@tiny-fish/sdk";
 import { goalFor, parseReport, REPORT_SCHEMA, scoreOutcomes, tasksFor, type TaskOutcome } from "@/lib/scan";
 import { cached, clientIp, remember, reserve, sameOrigin } from "@/lib/limits";
+import { runChecks, type Check } from "@/lib/checks";
 
 // Agent runs take a minute or more; the response streams progress the whole time.
 export const maxDuration = 300;
@@ -8,11 +9,13 @@ export const maxDuration = 300;
 // Stream events, one JSON object per line:
 //   { type: "progress", task, text }        an agent did something
 //   { type: "task", task, ok }              an agent finished
+//   { type: "checks", checks }              the verified site checks finished
 //   { type: "result", result, cached? }     final ScanResult (cached: replayed from a recent scan)
 //   { type: "error", message }
 export type ScanEvent =
   | { type: "progress"; task: number; text: string }
   | { type: "task"; task: number; ok: boolean }
+  | { type: "checks"; checks: { label: string; ok: boolean; detail: string }[] }
   | { type: "result"; result: ReturnType<typeof scoreOutcomes>; cached?: boolean }
   | { type: "error"; message: string };
 
@@ -54,6 +57,7 @@ export async function POST(req: Request) {
     const replay = new ReadableStream({
       start(controller) {
         hit.tasks.forEach((t, i) => controller.enqueue(line({ type: "task", task: i, ok: t[2] === 1 })));
+        if (hit.checks) controller.enqueue(line({ type: "checks", checks: hit.checks }));
         controller.enqueue(line({ type: "result", result: hit, cached: true }));
         controller.close();
       },
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
 
       const runTask = async (i: number): Promise<TaskOutcome> => {
         const task = tasks[i];
-        const outcome: TaskOutcome = { title: task.title, detail: task.detail, status: "FAILED", report: null };
+        const outcome: TaskOutcome = { title: task.title, detail: task.detail, status: "FAILED", report: null, steps: 0 };
         try {
           const events = await client.agent.stream(
             {
@@ -85,7 +89,10 @@ export async function POST(req: Request) {
             { signal: req.signal },
           );
           for await (const event of events) {
-            if (event.type === "PROGRESS") send({ type: "progress", task: i, text: event.purpose });
+            if (event.type === "PROGRESS") {
+              outcome.steps++;
+              send({ type: "progress", task: i, text: event.purpose });
+            }
             if (event.type === "COMPLETE") {
               outcome.status = event.status;
               outcome.report = parseReport(event.result);
@@ -100,11 +107,18 @@ export async function POST(req: Request) {
       };
 
       try {
-        const outcomes = await Promise.all(tasks.map((_, i) => runTask(i)));
+        // Free, fast checks run alongside the agents; a failure there never sinks the scan.
+        const checksDone = runChecks(url, type)
+          .catch((): Check[] => [])
+          .then((checks) => {
+            send({ type: "checks", checks: checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })) });
+            return checks;
+          });
+        const [outcomes, checks] = await Promise.all([Promise.all(tasks.map((_, i) => runTask(i))), checksDone]);
         if (outcomes.every((o) => !o.report && o.error)) {
           send({ type: "error", message: outcomes[0].error ?? "Every agent run failed." });
         } else {
-          const result = scoreOutcomes(type, outcomes);
+          const result = scoreOutcomes(type, outcomes, checks);
           remember(url, type, description, result);
           send({ type: "result", result });
         }

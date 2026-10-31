@@ -329,7 +329,7 @@ function ScoreCard() {
   const C = 2 * Math.PI * 54;
   return (
     <motion.div
-      className="card"
+      className="card sample-card"
       initial={{ opacity: 0, y: 60, rotate: 6, scale: 0.9 }}
       whileInView={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
       whileHover={{ rotate: -1.5, scale: 1.03, y: -6 }}

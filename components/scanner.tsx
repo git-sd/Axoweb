@@ -27,6 +27,19 @@ const phaseMotion = {
   transition: pop,
 };
 
+// "7.3 / 25" for a row's marks; nothing for sample results or items that carry no marks.
+function Marks({ earned, max }: { earned?: number; max?: number }) {
+  if (earned === undefined || !max) return null;
+  const full = earned >= max - 0.05;
+  return (
+    <span className="marks" data-full={full} title="Marks earned out of marks available, from a total of 100">
+      <b>{earned}</b> / {max}
+    </span>
+  );
+}
+
+const round = (n: number) => Math.round(n * 10) / 10;
+
 function hostOf(u: string) {
   try {
     return new URL(/^https?:\/\//.test(u) ? u : "https://" + u).hostname;
@@ -47,13 +60,14 @@ export default function Scanner() {
   const [host, setHost] = useState("");
   const [status, setStatus] = useState("");
   const [states, setStates] = useState<TaskState[]>([]);
-  const [shown, setShown] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [num, setNum] = useState(0);
   const [titles, setTitles] = useState<string[]>([]);
   // Latest thing each agent reported doing, shown under its task while it runs.
   const [steps, setSteps] = useState<string[]>([]);
   const [result, setResult] = useState<ScanResult | null>(null);
+  // Verified site checks; null while they are still running.
+  const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null);
   const [live, setLive] = useState(true);
   // The server replayed a recent scan of this site instead of running agents again.
   const [fromCache, setFromCache] = useState(false);
@@ -73,7 +87,6 @@ export default function Scanner() {
     setResult(r);
     setNum(0);
     setRevealed(false);
-    setShown(0);
     setPhase("results");
     await sleep(500);
     const t0 = performance.now();
@@ -88,10 +101,6 @@ export default function Scanner() {
     });
     await sleep(300);
     setRevealed(true);
-    for (let i = 1; i <= r.fixes.length; i++) {
-      await sleep(180);
-      setShown(i);
-    }
   }
 
   // Replays the bundled sample for this site type (used when the server has no TinyFish key).
@@ -124,6 +133,7 @@ export default function Scanner() {
     setTitles(tasks.map((t) => t.title));
     setStates(tasks.map(() => "run"));
     setSteps(tasks.map(() => ""));
+    setChecks(null);
     setStatus(`Sending 3 agents to ${h}…`);
     try {
       const res = await fetch("/api/scan", {
@@ -156,6 +166,8 @@ export default function Scanner() {
           if (e.type === "progress") {
             setSteps((s) => s.map((v, j) => (j === e.task ? e.text : v)));
             setStatus(e.text);
+          } else if (e.type === "checks") {
+            setChecks(e.checks);
           } else if (e.type === "task") {
             setStates((s) => s.map((v, j) => (j === e.task ? (e.ok ? "pass" : "fail") : v)));
           } else if (e.type === "result") {
@@ -390,6 +402,28 @@ export default function Scanner() {
                     </motion.div>
                   );
                 })}
+                {live && (
+                  <motion.div className="check" data-state={checks ? (checks.every((c) => c.ok) ? "pass" : "done") : "run"} transition={pop}>
+                    <motion.span
+                      key={checks ? "done" : "run"}
+                      className="dot"
+                      data-dot={checks ? "pass" : "run"}
+                      initial={checks ? { scale: 0 } : false}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                    >
+                      {checks ? "✓" : ""}
+                    </motion.span>
+                    <span className="check-text">
+                      Site checks
+                      <small>
+                        {checks
+                          ? `${checks.filter((c) => c.ok).length} of ${checks.length} passed`
+                          : "robots.txt, structured data, forms, content without JavaScript"}
+                      </small>
+                    </span>
+                  </motion.div>
+                )}
               </div>
             </motion.div>
           )}
@@ -442,7 +476,14 @@ export default function Scanner() {
                       whileHover={{ y: -4, rotate: -0.5 }}
                       transition={pop}
                     >
-                      <div className="card-label">Agent tasks</div>
+                      <div className="card-label">
+                        Agent tasks
+                        {result?.tasks[0]?.[4] !== undefined && (
+                          <span className="card-total">
+                            {round(result.tasks.reduce((a, t) => a + (t[3] ?? 0), 0))} / {round(result.tasks.reduce((a, t) => a + (t[4] ?? 0), 0))} marks
+                          </span>
+                        )}
+                      </div>
                       {result?.tasks.map((t, i) => (
                         <motion.div
                           key={t[0]}
@@ -458,6 +499,7 @@ export default function Scanner() {
                             <div className="t">{t[0]}</div>
                             <div className="d">{t[1]}</div>
                           </div>
+                          <Marks earned={t[3]} max={t[4]} />
                         </motion.div>
                       ))}
                     </motion.section>
@@ -471,7 +513,13 @@ export default function Scanner() {
                       <div className="card-label">Score breakdown</div>
                       {DIMS.map((d, i) => (
                         <div className="dim" key={d}>
-                          <div className="dim-head"><span>{d}</span><span>{result?.dims[i]}</span></div>
+                          <div className="dim-head">
+                            <span>
+                              {d}
+                              {result?.weights && <small className="dim-weight">{Math.round(result.weights[i] * 100)}% of score</small>}
+                            </span>
+                            <span>{result?.dims[i]}</span>
+                          </div>
                           <div className="bar">
                             <motion.div
                               initial={{ width: 0 }}
@@ -483,34 +531,62 @@ export default function Scanner() {
                       ))}
                     </motion.section>
                   </div>
-                  <motion.section
-                    className="card"
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...pop, delay: 0.16 }}
-                  >
+                  {!!result?.checks?.length && (
+                    <motion.section
+                      className="card site-checks"
+                      initial={{ opacity: 0, y: 50 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...pop, delay: 0.12 }}
+                    >
+                      <div className="card-label">
+                        Site checks · {result.checks.filter((c) => c.ok).length} of {result.checks.length} passed
+                        {result.checks.some((c) => c.max) && (
+                          <span className="card-total">
+                            {round(result.checks.reduce((a, c) => a + (c.marks ?? 0), 0))} / {round(result.checks.reduce((a, c) => a + (c.max ?? 0), 0))} marks
+                          </span>
+                        )}
+                      </div>
+                      <div className="site-checks-grid">
+                        {result.checks.map((c, i) => (
+                          <motion.div
+                            key={c.label}
+                            className="task-row"
+                            initial={{ opacity: 0, x: -16 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ ...pop, delay: 0.2 + i * 0.05 }}
+                          >
+                            <span className="dot" data-dot={c.ok ? "pass" : "fail"}>
+                              {c.ok ? "✓" : "✕"}
+                            </span>
+                            <div>
+                              <div className="t">{c.label}</div>
+                              <div className="d">{c.detail}</div>
+                            </div>
+                            <Marks earned={c.marks} max={c.max} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.section>
+                  )}
+                  <section className="card">
                     <div className="card-label">Ranked fixes</div>
-                    {result?.fixes.length === 0 && <p className="verdict-sub">The agents did not report any problems.</p>}
-                    {result?.fixes.map((f, i) => (
-                      <motion.div
-                        key={f[1]}
-                        className="fix"
-                        initial={false}
-                        animate={{ opacity: i < shown ? 1 : 0, y: i < shown ? 0 : 16, scale: i < shown ? 1 : 0.95 }}
-                        whileHover={{ x: 8 }}
-                        transition={pop}
-                      >
+                    {result?.fixes.length === 0 && <p className="verdict-sub">No problems found.</p>}
+                    {result?.fixes.map((f) => (
+                      <div key={f[1]} className="fix">
                         <span className="pri" data-priority={f[0]}>
                           {f[0].toUpperCase()}
                         </span>
                         <div>
-                          <b>{f[1]}</b>
+                          <b>
+                            {f[1]}
+                            {f[4] && <span className="verified">verified</span>}
+                          </b>
                           <span className="why">{f[2]}</span>
                           {f[3] > 0 && <em>+{f[3]} pts</em>}
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
-                  </motion.section>
+                  </section>
                   <div className="result-foot">
                     <button className="btn" onClick={reset}>Scan another site</button>
                     <p className="fineprint">

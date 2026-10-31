@@ -1,7 +1,8 @@
 // Live scans: what each TinyFish agent is asked to do, the report it must return, and how
 // those reports become the four dimension scores and the ranked fixes.
 
-import { SITES, total, type Priority } from "@/lib/sites";
+import { SITES, type Priority } from "@/lib/sites";
+import type { Check } from "@/lib/checks";
 
 export type ScanTask = { title: string; detail: string; goal: string };
 
@@ -171,6 +172,7 @@ export type TaskOutcome = {
   status: string; // TinyFish run status: COMPLETED, FAILED, ...
   report: AgentReport | null;
   error?: string;
+  steps: number; // actions the agent took (counted from its progress events)
 };
 
 export function tasksFor(type: string): ScanTask[] {
@@ -202,11 +204,32 @@ export function parseReport(result: unknown): AgentReport | null {
 
 export type ScanResult = {
   type: string;
-  tasks: [string, string, 0 | 1][];
+  // [title, what happened, passed, marks earned, marks available]; marks are points of the 100.
+  tasks: [string, string, 0 | 1, number?, number?][];
   dims: number[];
-  fixes: [Priority, string, string, number][];
+  // Share of the final score each dimension carries for this site type (sums to 1).
+  weights?: number[];
+  // [priority, problem, fix, estimated points, verified]; verified fixes come from site checks.
+  fixes: [Priority, string, string, number, boolean?][];
   score: number;
+  checks?: { label: string; ok: boolean; detail: string; marks?: number; max?: number }[];
 };
+
+const STOP = new Set("the a an and or of to for on in is are be with no not this that it its site page there can".split(" "));
+
+function significantWords(text: string) {
+  return new Set(text.toLowerCase().match(/[a-z0-9]{3,}/g)?.filter((w) => !STOP.has(w)) ?? []);
+}
+
+// Share of the smaller set's words that also appear in the other (0..1).
+function overlap(a: Set<string>, b: Set<string>) {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  return shared / Math.min(a.size, b.size);
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // Agents sometimes ignore the one-sentence instruction; keep the card readable anyway.
 function clip(text: string, max = 160) {
@@ -222,54 +245,127 @@ const SEVERITY: Record<string, { pri: Priority; pts: number; rank: number }> = {
   low: { pri: "low", pts: 3, rank: 2 },
 };
 
-// Per task, each dimension gets full marks, partial credit, or near zero; the site's score
-// for a dimension is the average across its three tasks.
+// How much of each dimension comes from the agents versus the verified site checks.
+const AGENT_SHARE = 0.7;
+// Marks per task, in the order the tasks run: finding the thing, working with it, then the
+// final goal (checkout, booking, submit). The final goal carries the most because it is the
+// reason the site exists. Tasks beyond the third share what is left equally.
+const TASK_WEIGHTS = [0.25, 0.35, 0.4];
+
+// An agent that needed more actions than this to reach the end loses some Navigability.
+const EFFICIENT_STEPS = 12;
+
+// Per task, each dimension gets full marks, partial credit, or near zero; the agents' score
+// for a dimension is the average across the three tasks.
 //   Discoverability: could the agent find where the task starts?
-//   Navigability:    could it get to the final step?
+//   Navigability:    could it get to the final step, and without wandering?
 //   Actionability:   could the task actually be done (stopping only at submit)?
-//   Reliability:     did the run finish cleanly, without bot walls or page errors?
-export function scoreOutcomes(type: string, outcomes: TaskOutcome[]): ScanResult {
-  const per = outcomes.map(({ status, report: r }) => {
+//   Reliability:     did the run finish cleanly and deliver, without bot walls or page errors?
+// Each dimension is then blended with the weighted pass rate of the site checks that feed it.
+export function scoreOutcomes(type: string, outcomes: TaskOutcome[], checks: Check[] = []): ScanResult {
+  const per = outcomes.map(({ status, report: r, steps }) => {
     if (!r) return [10, 5, 0, status === "COMPLETED" ? 30 : 0];
     const blockedHard = r.blocked_by === "captcha_or_bot_check" || r.blocked_by === "page_error";
     return [
       r.found_entry_point ? 100 : 20,
-      r.reached_final_step ? 100 : r.found_entry_point ? 45 : 10,
+      r.reached_final_step ? (steps > EFFICIENT_STEPS ? 80 : 100) : r.found_entry_point ? 45 : 10,
       r.task_achievable ? 100 : r.reached_final_step ? 55 : 10,
-      status !== "COMPLETED" ? 0 : blockedHard ? 25 : r.blocked_by === "login_required" ? 60 : 100,
+      // Reliability: a clean finish only earns full marks if the site actually delivered; a run
+      // that completed but found nothing (or hit a wall) says little good about the site.
+      status !== "COMPLETED"
+        ? 0
+        : blockedHard
+          ? 25
+          : r.blocked_by === "login_required"
+            ? 60
+            : r.task_achievable
+              ? 100
+              : r.found_entry_point
+                ? 75
+                : 50,
     ];
   });
-  const dims = [0, 1, 2, 3].map((d) => Math.round(per.reduce((a, p) => a + p[d], 0) / Math.max(1, per.length)));
   const site = SITES[type] ?? SITES.custom;
-  const score = total({ ...site, dims });
+  const raw = per.map((_, i) => TASK_WEIGHTS[i] ?? 0.1);
+  const tw = raw.map((w) => w / (raw.reduce((a, b) => a + b, 0) || 1)); // sums to 1
 
-  // Merge problems across tasks, most severe first, dropping near-duplicates.
-  const seen = new Set<string>();
-  const problems = outcomes
-    .flatMap((o) => o.report?.problems ?? [])
-    .sort((a, b) => (SEVERITY[a.severity]?.rank ?? 2) - (SEVERITY[b.severity]?.rank ?? 2))
-    .filter((p) => {
-      const k = p.problem.toLowerCase().replace(/[^a-z]/g, "").slice(0, 40);
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    })
-    .slice(0, 5);
+  // Each dimension is worth site.w[d] of the 100 marks. Within it, the agents carry
+  // AGENT_SHARE and the checks the rest; a dimension with no scored checks is all agents.
+  const checkWeight = [0, 1, 2, 3].map((d) => checks.filter((c) => c.dim === d).reduce((a, c) => a + c.weight, 0));
+  const share = checkWeight.map((w) => (w > 0 ? AGENT_SHARE : 1));
+
+  // Marks: a task earns, in each dimension, its slice of that dimension's agent marks times
+  // how well it did (0-100%); a check earns its slice of the check marks if it passed.
+  // Every figure below is in points of the 100, so they add up to the score.
+  const taskMarks = per.map((p, i) => {
+    const max = site.w.reduce((a, w, d) => a + w * share[d] * 100 * tw[i], 0);
+    const earned = site.w.reduce((a, w, d) => a + w * share[d] * p[d] * tw[i], 0);
+    return { earned, max };
+  });
+  const checkMarks = checks.map((c) => {
+    const max = checkWeight[c.dim] ? site.w[c.dim] * (1 - share[c.dim]) * 100 * (c.weight / checkWeight[c.dim]) : 0;
+    return { earned: c.ok ? max : 0, max };
+  });
+  const dimsRaw = [0, 1, 2, 3].map((d) => {
+    const agents = per.reduce((a, p, i) => a + p[d] * tw[i], 0);
+    if (!checkWeight[d]) return agents;
+    const passed = (checks.filter((c) => c.dim === d && c.ok).reduce((a, c) => a + c.weight, 0) / checkWeight[d]) * 100;
+    return agents * share[d] + passed * (1 - share[d]);
+  });
+  const dims = dimsRaw.map(Math.round);
+  const score = Math.round([...taskMarks, ...checkMarks].reduce((a, m) => a + m.earned, 0));
+
+  // Failed checks and agent-reported problems in one list: most severe first, verified
+  // findings ahead of agent opinions at the same severity, near-duplicates dropped.
+  type Finding = { severity: string; problem: string; fix: string; verified: boolean };
+  const findings: Finding[] = [
+    ...checks
+      .filter((c) => !c.ok)
+      .map((c) => ({ severity: c.severity === "med" ? "medium" : c.severity, problem: `${c.label}: ${c.detail}`, fix: c.fix, verified: true })),
+    ...outcomes.flatMap((o) => (o.report?.problems ?? []).map((p) => ({ ...p, verified: false }))),
+  ];
+  const bySeverity = (a: Finding, b: Finding) =>
+    (SEVERITY[a.severity]?.rank ?? 2) - (SEVERITY[b.severity]?.rank ?? 2) || Number(b.verified) - Number(a.verified);
+  // Three agents often report the same problem in different words; keep the first of each.
+  const kept: { finding: Finding; words: Set<string> }[] = [];
+  for (const f of [...findings].sort(bySeverity)) {
+    const words = significantWords(f.problem);
+    if (kept.some((k) => overlap(k.words, words) >= 0.34)) continue;
+    kept.push({ finding: f, words });
+  }
+  // Up to 3 verified findings are guaranteed a place, so agent opinions can't crowd them out.
+  const verified = kept.filter((k) => k.finding.verified).slice(0, 3);
+  const opinions = kept.filter((k) => !k.finding.verified).slice(0, 6 - verified.length);
+  const ranked = [...verified, ...opinions].map((k) => k.finding).sort(bySeverity);
   // Points are an estimate, capped so the fixes never promise more than the score is missing
   // (a perfect score gives 0, and the UI then shows the fix without a points badge).
   let room = 100 - score;
-  const fixes = problems.map((p) => {
+  const fixes = ranked.map((p) => {
     const s = SEVERITY[p.severity] ?? SEVERITY.low;
     const pts = Math.min(s.pts, room);
     room = Math.max(0, room - pts);
-    return [s.pri, p.problem, p.fix, pts] as [Priority, string, string, number];
+    return [s.pri, p.problem, p.fix, pts, p.verified] as [Priority, string, string, number, boolean];
   });
 
   return {
     type,
-    tasks: outcomes.map((o) => [o.title, clip(o.report?.summary || o.error || o.detail), o.report?.task_achievable ? 1 : 0]),
+    tasks: outcomes.map((o, i) => [
+      o.title,
+      clip(o.report?.summary || o.error || o.detail),
+      o.report?.task_achievable ? 1 : 0,
+      round1(taskMarks[i].earned),
+      round1(taskMarks[i].max),
+    ]),
     dims,
+    weights: site.w,
     fixes,
     score,
+    checks: checks.map((c, i) => ({
+      label: c.label,
+      ok: c.ok,
+      detail: c.detail,
+      marks: round1(checkMarks[i].earned),
+      max: round1(checkMarks[i].max),
+    })),
   };
 }
