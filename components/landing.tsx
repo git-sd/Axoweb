@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MotionConfig, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { nunito } from "@/lib/fonts";
 import GlyphPortal, { type GlyphPortalStyle } from "@/components/ui/glyph-portal";
 import TinyfishLogo from "@/components/tinyfish-logo";
@@ -98,6 +99,8 @@ function HeroPanel({ landed }: { landed: boolean }) {
         width: "100%",
         // Grid item: allow shrinking below the URL box's intrinsic width on phones.
         minWidth: 0,
+        // Leaves room for the floating navbar, which appears over the top of this panel.
+        paddingTop: 76,
         margin: "0 auto",
       }}
     >
@@ -170,7 +173,7 @@ function fadeWall(p: number) {
 // Drop the portal's caption (scroll hint and enter link); scrolling is the only way in.
 const heroCss = `[data-axo-hero] [data-gp-caption]{display:none;}`;
 
-function Hero() {
+function Hero({ onLanded }: { onLanded: (landed: boolean) => void }) {
   // The portal freezes its face on mount, so wait for Nunito before mounting it.
   const [face, setFace] = useState<string | null>(null);
   // Flips as the copy fades in (and back on the way out), so its bounce replays each visit.
@@ -209,6 +212,7 @@ function Hero() {
       onProgress={(p) => {
         fadeWall(p);
         setLanded(p > 0.8);
+        onLanded(p > 0.8);
       }}
       style={{ ...theme, fontFamily: face }}
       background={<TaskWall />}
@@ -289,6 +293,56 @@ function HeroFloaters() {
         <Axolotl size={190} />
       </motion.div>
     </>
+  );
+}
+
+const NAV_LINKS: [string, string][] = [
+  ["#how", "How it works"],
+  ["#get", "What you get"],
+];
+
+// A pill that drops in from above once the hero zoom has landed, and lifts away again if
+// you scroll back into the intro. Block style, like the URL box, so it reads on both the
+// pink and the dark sections.
+function Navbar({ show }: { show: boolean }) {
+  return (
+    <div className="nav-rail">
+      <AnimatePresence>
+        {show && (
+          <motion.nav
+            key="nav"
+            className="nav"
+            aria-label="Main"
+            initial={{ y: -140, scale: 0.7, rotate: -4 }}
+            animate={{ y: 0, scale: 1, rotate: 0 }}
+            exit={{ y: -140, scale: 0.8, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 13 }}
+          >
+            <a href="#top" className="nav-brand" aria-label="Back to the top">
+              <AxolotlMark size={28} />
+              <span>axolotl</span>
+            </a>
+            <div className="nav-links">
+              {NAV_LINKS.map(([href, label]) => (
+                <a key={href} href={href} className="nav-link">
+                  {label}
+                </a>
+              ))}
+              <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="nav-link nav-gh">
+                <GithubIcon size={16} />
+                <span>GitHub</span>
+              </a>
+            </div>
+            <Link href="/scan" className="nav-cta">
+              Scan site
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </Link>
+          </motion.nav>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -612,10 +666,12 @@ function Cta() {
 }
 
 export default function Landing() {
+  const [navOn, setNavOn] = useState(false);
   return (
     <MotionConfig reducedMotion="user">
-      <main>
-        <Hero />
+      <Navbar show={navOn} />
+      <main id="top">
+        <Hero onLanded={setNavOn} />
         <Tasks />
         <How />
         <Get />

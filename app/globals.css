@@ -354,6 +354,152 @@ button {
   }
 }
 
+/* ---------- landing: floating navbar ---------- */
+
+/* z-index scale: content 0-10, navbar 50. The rail spans the page so the pill can be centred
+   without a transform (motion animates the pill's own transform). It lets clicks through. */
+.nav-rail {
+  position: fixed;
+  top: 16px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.nav {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 6px 6px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--shell);
+  box-shadow: 4px 4px 0 var(--ink);
+  color: var(--ink);
+}
+
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-right: 8px;
+  font-size: 17px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.35s var(--boing);
+}
+
+.nav-link:hover {
+  background: rgba(58, 15, 31, 0.1);
+  transform: translateY(-2px);
+}
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-left: 4px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--shell);
+  font-size: 15px;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.2s, transform 0.35s var(--boing);
+}
+
+.nav-cta svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.35s var(--boing);
+}
+
+.nav-cta:hover {
+  background: #4d1529;
+  transform: translateY(-2px) scale(1.04);
+}
+
+.nav-cta:hover svg {
+  transform: translateX(3px);
+}
+
+.nav-cta:active {
+  transform: scale(0.94);
+}
+
+/* On the pink and shell nav, focus rings must be dark to be seen. */
+.nav a:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Phones: keep the logo and the button, drop the text links to save room. */
+@media (max-width: 640px) {
+  .nav-links .nav-link:not(.nav-gh) {
+    display: none;
+  }
+  .nav-gh span {
+    display: none;
+  }
+  .nav-gh {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nav-brand span {
+    display: none;
+  }
+}
+
+/* Anchor jumps stop below the floating nav, and glide unless motion is reduced. */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.section {
+  scroll-margin-top: 88px;
+}
+
 /* ---------- landing: task strip ---------- */
 
 .strip {
