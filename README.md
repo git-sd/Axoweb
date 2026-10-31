@@ -4,6 +4,8 @@ Agent experience optimization: SEO for AI agents. Axolotl sends real [TinyFish](
 
 Agents never submit, pay, book, sign up or type personal details on the sites they test.
 
+This repository is the website (landing page and scanner). The scanner on its own, without the landing page, is at [github.com/git-sd/axolotl](https://github.com/git-sd/axolotl), which is the one to clone if you want to run it yourself.
+
 ## Run locally
 
 ```bash

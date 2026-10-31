@@ -17,7 +17,7 @@ export type Check = {
   fix: string;
 };
 
-const UA = "Mozilla/5.0 (compatible; AxolotlBot/1.0; +https://github.com/git-sd/Axoweb)";
+const UA = "Mozilla/5.0 (compatible; AxolotlBot/1.0; +https://github.com/git-sd/axolotl)";
 const TIMEOUT_MS = 8000;
 
 // User agents of AI crawlers and assistants that browse on someone's behalf.
