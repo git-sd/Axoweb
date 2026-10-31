@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Axolotl × TinyFish
 
-## Getting Started
+Agent experience optimization: SEO for AI agents. Axolotl sends real [TinyFish](https://tinyfish.ai) web agents to a website, has them attempt three tasks that matter for that kind of site (booking, e-commerce, SaaS, docs or lead-gen forms), and scores how well they got through on four dimensions: Discoverability, Navigability, Actionability and Reliability. It finishes with a ranked list of fixes.
 
-First, run the development server:
+Agents never submit, pay, book, sign up or type personal details on the sites they test.
+
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Without a TinyFish key the scanner replays bundled sample results.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set these in `.env.local` locally, or in your host's environment variables (Vercel: Project → Settings → Environment Variables).
 
-## Learn More
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TINYFISH_API_KEY` | none | Enables live scans. Server-only; never sent to the browser. |
+| `SCAN_LIMIT_PER_HOUR` | `3` | Scans each visitor (by IP) can start per hour |
+| `SCAN_DAILY_BUDGET` | `40` | Scans everyone together can start per day |
+| `SCAN_MAX_CONCURRENT` | `3` | Scans running at the same time |
+| `SCAN_CACHE_MINUTES` | `60` | Re-scanning the same site within this window reuses the result |
 
-To learn more about Next.js, take a look at the following resources:
+Setting any of the first three limits to `0` pauses live scans. A scan uses roughly 30 TinyFish agent steps.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The limits are kept in server memory, so on hosts that run several instances (such as Vercel) each instance counts separately.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Where things are
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `components/landing.tsx`: landing page, including the Glyph Portal hero
+- `components/scanner.tsx`: the scan flow (pick a site type, enter an address, live progress, results)
+- `app/api/scan/route.ts`: runs the three TinyFish agents and streams their progress
+- `lib/scan.ts`: the tasks per site type, the agents' safety rules, and scoring
+- `lib/limits.ts`: rate limits, daily budget and result cache
