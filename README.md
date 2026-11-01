@@ -53,6 +53,52 @@ npm run dev
 
 Both need Node 18+. Scans need a TinyFish API key from [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys); never commit it.
 
+## Use it from your coding agent (MCP)
+
+The MCP server lets Claude Code, Claude Desktop, Codex, Cursor and other agents check a website while you build it. Two tools:
+
+- **`axolotl_check`**: free, instant, no keys. Runs the 26 site checks on your own machine, so it works on `localhost`. Returns a score, four dimension scores, and every failed check with a fix.
+- **`axolotl_scan`**: the full scan. TinyFish web agents try real tasks on a public address (3 to 8 minutes, uses your own TinyFish credits). Needs `TINYFISH_API_KEY` and `AXOLOTL_URL` set for the server.
+
+Set up once:
+
+```bash
+git clone https://github.com/git-sd/Axoweb.git
+cd Axoweb/mcp
+npm install
+```
+
+**Claude Code**
+
+```bash
+claude mcp add axolotl -- node /path/to/Axoweb/mcp/server.mjs
+```
+
+**Claude Desktop** (add to `claude_desktop_config.json`), and the same block works for **Cursor** (`.cursor/mcp.json`), **Gemini CLI** and **Windsurf**:
+
+```json
+{
+  "mcpServers": {
+    "axolotl": {
+      "command": "node",
+      "args": ["/path/to/Axoweb/mcp/server.mjs"]
+    }
+  }
+}
+```
+
+**Codex** (`~/.codex/config.toml`)
+
+```toml
+[mcp_servers.axolotl]
+command = "node"
+args = ["/path/to/Axoweb/mcp/server.mjs"]
+```
+
+Then teach your agent the loop (check, fix, check again) with the skill: copy `mcp/skill/SKILL.md` to `~/.claude/skills/axolotl/SKILL.md` for Claude, or paste it into `AGENTS.md` or your rules file for other tools. Try it by asking: "Check localhost:3000 for agent readiness and fix what you find."
+
+Full setup, scan variables and limits are in [`mcp/README.md`](mcp/README.md).
+
 Agents never submit, pay, book, sign up or type personal details on the sites they test.
 
 The name "Axolotl" and all three parts are described in the table above; each folder has its own README with details.
