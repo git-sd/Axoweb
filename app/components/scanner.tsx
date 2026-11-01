@@ -239,6 +239,9 @@ export default function Scanner() {
 
         {phase === "loading" && (
           <div>
+            <div className="loading-axolotl">
+              <AxolotlMark size={150} />
+            </div>
             <h2>Sending agents to your site</h2>
             <p className="status" aria-live="polite">
               {status}

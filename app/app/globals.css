@@ -1,4 +1,4 @@
-/* Axolotl palette: dark pond water, pale pink body, coral gills. Flat colour, no animation. */
+/* Axolotl palette: dark pond water, pale pink body, coral gills. Flat colour; the only motion is the axolotl on the loading screen. */
 :root {
   --pond: #0c0d10;
   --pond-2: #15171b;
@@ -63,6 +63,7 @@ button {
 .topbar .wrap {
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 68px;
 }
 
@@ -1237,4 +1238,28 @@ select {
 .type:disabled small {
   font-weight: 800;
   color: var(--coral);
+}
+
+/* The axolotl that floats while the agents work: a slow bob and tilt, nothing busy. */
+.loading-axolotl {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 28px;
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-axolotl {
+    animation: none;
+  }
 }
