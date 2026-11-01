@@ -53,7 +53,7 @@ server.registerTool(
   async ({ url, type, description }) => {
     if (!KEY) return fail("axolotl_scan needs your TinyFish key. Set TINYFISH_API_KEY in this MCP server's environment (get one at tinyfish.ai), then restart it. axolotl_check works without a key.");
     try {
-      const res = await fetch(`${BASE}/api/scan`, { method: "POST", headers: { "Content-Type": "application/json", "X-TinyFish-Key": KEY }, body: JSON.stringify({ url, type, description }), signal: AbortSignal.timeout(320_000) });
+      const res = await fetch(`${BASE}/api/scan`, { method: "POST", headers: { "Content-Type": "application/json", "X-TinyFish-Key": KEY }, body: JSON.stringify({ url, type, description }), signal: AbortSignal.timeout(720_000) });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
         return fail(data.error || `Axolotl returned ${res.status}`);

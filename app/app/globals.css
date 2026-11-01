@@ -325,10 +325,10 @@ textarea.field {
   color: var(--ink);
 }
 
-/* A task in progress: a ring with a gap. Static, not spinning. */
+/* A task in progress: a solid coral dot. Nothing spins or moves. */
 .dot[data-dot="run"] {
   border-color: var(--coral);
-  border-top-color: transparent;
+  background: var(--coral);
 }
 
 .dot[data-dot="pass"] {

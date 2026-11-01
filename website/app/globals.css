@@ -1269,10 +1269,10 @@ textarea.field {
   color: var(--ink);
 }
 
+/* A task in progress: a solid coral dot. Nothing spins or moves. */
 .dot[data-dot="run"] {
   border-color: var(--coral);
-  border-top-color: transparent;
-  animation: spin 0.7s linear infinite;
+  background: var(--coral);
 }
 
 .dot[data-dot="pass"] {
@@ -1283,19 +1283,6 @@ textarea.field {
 .dot[data-dot="fail"] {
   border-color: var(--fail);
   background: var(--fail);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dot[data-dot="run"] {
-    animation: none;
-    border-top-color: var(--coral);
-  }
 }
 
 /* results */
