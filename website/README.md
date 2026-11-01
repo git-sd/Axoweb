@@ -42,3 +42,7 @@ The limits are kept in server memory, so on hosts that run several instances (su
 - `app/api/scan/route.ts`: runs the six TinyFish agents and the site checks, and streams their progress
 - `lib/scan.ts`: the tasks per site type, the agents' safety rules, and scoring
 - `lib/limits.ts`: rate limits, daily budget and result cache
+
+## Deploying the website
+
+On Vercel, set the project's **Root Directory** to `website`. The scanner needs a `TINYFISH_API_KEY` environment variable there; see `.env.example` in this folder for the optional limits.
