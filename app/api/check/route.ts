@@ -42,12 +42,17 @@ export async function POST(req: Request) {
     const total = mine.reduce((a, c) => a + c.weight, 0);
     return total ? Math.round((mine.filter((c) => c.ok).reduce((a, c) => a + c.weight, 0) / total) * 100) : 100;
   });
-  const score = Math.round(dims.reduce((a, v, i) => a + v * w[i], 0));
+  // When the page itself would not load, only the root files were checked and the rest counts as
+  // full marks, which would flatter a dead site. Cap it at about what a full scan gives one.
+  const unreachable = checks.some((c) => c.id === "fetch");
+  const raw = Math.round(dims.reduce((a, v, i) => a + v * w[i], 0));
+  const score = unreachable ? Math.min(raw, 15) : raw;
   return Response.json({
     url,
     type,
     score,
     scope: "site checks only (no agents run)",
+    ...(unreachable ? { warning: "The page did not load for an automated visitor, so most checks could not run." } : {}),
     dimensions: DIMS.map((name, i) => ({ name, score: dims[i], weight: w[i] })),
     checks: checks.map((c) => ({ label: c.label, dimension: DIMS[c.dim], applicable: c.weight > 0, passed: c.ok, detail: c.detail, ...(c.weight > 0 && !c.ok ? { severity: c.severity, fix: c.fix } : {}) })),
   });
