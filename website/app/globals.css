@@ -2332,80 +2332,27 @@ select {
   }
 }
 
-/* The TinyFish key card under the address field: always visible, saved on request. */
-.keycard {
-  max-width: 560px;
-  margin: 8px auto 28px;
-  padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--pond-2);
-  text-align: left;
+/* Optional "use your own TinyFish key" box under the address field. */
+.keybox {
+  margin: 4px 0 20px;
+  text-align: center;
 }
 
-.keycard-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+.keybox .field {
+  margin-top: 12px;
 }
 
-.keycard-head b {
-  font-size: 16px;
-  font-weight: 900;
+.keybox .hint {
+  margin-top: 8px;
 }
 
-.keycard-tag {
-  padding: 3px 12px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
+.mcp-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--muted);
 }
 
-.keycard-tag[data-state="saved"] {
-  color: var(--pass);
-}
-
-.keycard-tag[data-state="required"] {
-  color: var(--coral);
-}
-
-.keycard .field {
-  margin: 0;
-}
-
-.keycard-saved {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.keycard-saved code {
-  margin-right: auto;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.keycard-remember {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.keycard-remember input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--coral);
-}
-
-.keycard .hint {
-  margin: 6px 0 0;
-  text-align: left;
+.mcp-note code {
+  color: var(--body);
 }

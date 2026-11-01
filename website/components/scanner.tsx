@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import TinyfishLogo from "@/components/tinyfish-logo";
 import AxolotlMark from "@/components/axolotl-mark";
@@ -30,35 +30,6 @@ const phaseMotion = {
   transition: pop,
 };
 
-// The visitor's TinyFish key, if they chose to save it on this device. It stays in this browser
-// and is only ever sent along with their own scan.
-const KEY_STORE = "axolotl-tinyfish-key";
-const keyListeners = new Set<() => void>();
-function readSavedKey() {
-  try {
-    return localStorage.getItem(KEY_STORE) ?? "";
-  } catch {
-    return "";
-  }
-}
-function writeSavedKey(value: string) {
-  try {
-    if (value) localStorage.setItem(KEY_STORE, value);
-    else localStorage.removeItem(KEY_STORE);
-  } catch {
-    // Storage blocked: the key is simply not remembered.
-  }
-  keyListeners.forEach((f) => f());
-}
-function subscribeKey(cb: () => void) {
-  keyListeners.add(cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    keyListeners.delete(cb);
-    window.removeEventListener("storage", cb);
-  };
-}
-
 function hostOf(u: string) {
   try {
     return new URL(/^https?:\/\//.test(u) ? u : "https://" + u).hostname;
@@ -85,14 +56,9 @@ export default function Scanner() {
   // Latest thing each agent reported doing, shown under its task while it runs.
   const [steps, setSteps] = useState<string[]>([]);
   const [watch, setWatch] = useState<string[]>([]);
-  // A key typed in this visit, a saved one from earlier, and whether this server has its own.
+  // The visitor's own TinyFish key: held in memory only, never stored in the browser or on our server.
   const [userKey, setUserKey] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [changing, setChanging] = useState(false);
-  const [serverKey, setServerKey] = useState<boolean | null>(null);
-  const savedKey = useSyncExternalStore(subscribeKey, readSavedKey, () => "");
-  const activeKey = userKey.trim() || savedKey;
-  const keyInput = useRef<HTMLInputElement>(null);
+  const [keyOpen, setKeyOpen] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   // Verified site checks; null while they are still running.
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null);
@@ -109,13 +75,6 @@ export default function Scanner() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [phase]);
-
-  useEffect(() => {
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((c: { serverKey?: boolean }) => setServerKey(!!c.serverKey))
-      .catch(() => setServerKey(null));
-  }, []);
 
   // Counts the score up, then reveals the cards and fixes one by one.
   async function reveal(r: ScanResult) {
@@ -156,13 +115,13 @@ export default function Scanner() {
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(activeKey ? { "X-TinyFish-Key": activeKey } : {}) },
+        headers: { "Content-Type": "application/json", ...(userKey.trim() ? { "X-TinyFish-Key": userKey.trim() } : {}) },
         body: JSON.stringify({ url: url.trim(), type: key, description: sel === "own" ? desc : undefined }),
       });
       if (res.status === 503) {
         // No key on the server and none from the visitor: never invent results.
-        setErr("This site has no TinyFish key of its own. Add yours below to run a live scan.");
-        setChanging(true);
+        setErr("This site has no TinyFish key of its own. Add your own key below to run a live scan.");
+        setKeyOpen(true);
         setPhase("address");
         return;
       }
@@ -224,15 +183,7 @@ export default function Scanner() {
       setShake((n) => n + 1);
       return;
     }
-    // A server without its own key cannot scan until the visitor adds theirs.
-    if (serverKey === false && !activeKey) {
-      setErr("Add your TinyFish key below to run a scan.");
-      keyInput.current?.focus();
-      return;
-    }
     setErr("");
-    // Remember a newly typed key on this device if the visitor asked for that.
-    if (userKey.trim() && remember) writeSavedKey(userKey.trim());
     scan(h);
   }
 
@@ -371,27 +322,13 @@ export default function Scanner() {
                 transition={{ duration: 0.4 }}
               />
               <p className="err" id="address-err" role="alert">{err}</p>
-              <div className="keycard">
-                <div className="keycard-head">
-                  <b>Your TinyFish key</b>
-                  <span className="keycard-tag" data-state={savedKey && !changing ? "saved" : serverKey === false ? "required" : "optional"}>
-                    {savedKey && !changing ? "Saved on this device" : serverKey === false ? "Required" : "Optional"}
-                  </span>
-                </div>
-                {savedKey && !changing ? (
-                  <div className="keycard-saved">
-                    <code>{`sk-…${savedKey.slice(-4)}`}</code>
-                    <button type="button" className="btn-quiet" onClick={() => { setChanging(true); setUserKey(""); }}>
-                      Change
-                    </button>
-                    <button type="button" className="btn-quiet" onClick={() => { writeSavedKey(""); setUserKey(""); setChanging(false); }}>
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <>
+              <div className="keybox">
+                <button type="button" className="btn-quiet" aria-expanded={keyOpen} aria-controls="tf-key" onClick={() => setKeyOpen((o) => !o)}>
+                  {keyOpen ? "Hide TinyFish key" : "Use your own TinyFish key"}
+                </button>
+                {keyOpen && (
+                  <div id="tf-key">
                     <input
-                      ref={keyInput}
                       className="field"
                       type="password"
                       autoComplete="off"
@@ -401,18 +338,11 @@ export default function Scanner() {
                       aria-label="Your TinyFish API key"
                       placeholder="sk-tinyfish-..."
                     />
-                    <label className="keycard-remember">
-                      <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-                      Save it on this device for next time
-                    </label>
-                  </>
+                    <p className="hint">
+                      The scan then runs on your TinyFish account. Your key goes straight to TinyFish with this scan, is not saved anywhere, and is forgotten when you close or reload this page.
+                    </p>
+                  </div>
                 )}
-                <p className="hint">
-                  {serverKey === false
-                    ? "This scan runs on your own TinyFish account, so Axolotl needs your key. "
-                    : "Leave it empty to use Axolotl's key, or add yours to scan on your own TinyFish credits. "}
-                  It goes straight to TinyFish with your scan. If you save it, it stays in this browser only, and Remove deletes it.
-                </p>
               </div>
               <div className="actions">
                 <button className="btn-quiet" onClick={() => setPhase("pick")}>← Back</button>
