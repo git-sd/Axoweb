@@ -40,6 +40,9 @@ export default function Scanner() {
   // Verified site checks; null while they are still running.
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
+  // Lets the server re-run only the tasks that had no verdict, and a note if that cannot happen.
+  const [scanId, setScanId] = useState("");
+  const [notice, setNotice] = useState("");
   // The server replayed a recent scan of this site instead of running agents again.
   const [fromCache, setFromCache] = useState(false);
   const running = useRef(false);
@@ -54,15 +57,18 @@ export default function Scanner() {
   }, [phase]);
 
   // Runs the TinyFish agents and site checks through /api/scan and follows their progress live.
-  async function scan(h: string) {
+  // retryTasks: re-run only these tasks of the scan on screen and merge them into its result.
+  async function scan(h: string, retryTasks?: number[]) {
     if (running.current) return;
     running.current = true;
     setHost(h);
     setPhase("loading");
+    setNotice("");
     const tasks = tasksFor(key);
     setFromCache(false);
     setTitles(tasks.map((t) => t.title));
-    setStates(tasks.map(() => "queued"));
+    // Tasks that already have a result keep it on screen; only the unfinished ones start over.
+    setStates(tasks.map((_, i) => (!retryTasks ? "queued" : retryTasks.includes(i) ? "queued" : result?.tasks[i]?.[2] ? "pass" : "fail")));
     setSteps(tasks.map(() => ""));
     setWatch(tasks.map(() => ""));
     setChecks(null);
@@ -71,7 +77,7 @@ export default function Scanner() {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), type: key, description: sel === "own" ? desc : undefined }),
+        body: JSON.stringify(retryTasks ? { retry: { scanId, tasks: retryTasks } } : { url: url.trim(), type: key, description: sel === "own" ? desc : undefined }),
       });
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
@@ -107,6 +113,7 @@ export default function Scanner() {
           } else if (e.type === "result") {
             final = e.result;
             setFromCache(!!e.cached);
+            setScanId(e.scanId ?? "");
           } else if (e.type === "error") {
             throw new Error(e.message);
           }
@@ -116,8 +123,15 @@ export default function Scanner() {
       setResult(final);
       setPhase("results");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "The scan failed.");
-      setPhase("address");
+      const message = e instanceof Error ? e.message : "The scan failed.";
+      if (retryTasks && result) {
+        // A failed re-run leaves the earlier result in place.
+        setNotice(message);
+        setPhase("results");
+      } else {
+        setErr(message);
+        setPhase("address");
+      }
     } finally {
       running.current = false;
     }
@@ -313,7 +327,14 @@ export default function Scanner() {
               </span>
             </div>
 
-            <Report result={result} host={host} fromCache={fromCache} onReset={reset} />
+            <Report
+              result={result}
+              host={host}
+              fromCache={fromCache}
+              onReset={reset}
+              notice={notice}
+              onRetry={scanId ? (tasks) => scan(host, tasks) : undefined}
+            />
           </div>
         )}
       </main>

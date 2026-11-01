@@ -132,11 +132,16 @@ export default function Report({
   host,
   fromCache,
   onReset,
+  onRetry,
+  notice,
 }: {
   result: ScanResult;
   host: string;
   fromCache: boolean;
   onReset: () => void;
+  // Re-run just these tasks (the ones with no result) and merge them into this report.
+  onRetry?: (tasks: number[]) => void;
+  notice?: string;
 }) {
   const siteName = (SITES[result.type] ?? SITES.custom).name;
   const overall = gradeOf(result.score);
@@ -148,6 +153,7 @@ export default function Report({
   const passed = scored.filter((t) => t[2]).length;
   const checksScored = result.checks?.filter((c) => c.max) ?? [];
   const checksPassed = checksScored.filter((c) => c.ok).length;
+  const unfinished = result.tasks.map((_, i) => i).filter((i) => result.taskDetails?.[i]?.unscored);
   const seconds = result.stats?.seconds;
   const time = seconds ? `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s` : null;
 
@@ -419,8 +425,18 @@ export default function Report({
       </section>
 
       <div className="result-foot">
+        {notice && (
+          <p className="err" role="alert">
+            {notice}
+          </p>
+        )}
         <div className="actions">
-          <button className="btn" onClick={onReset}>
+          {onRetry && unfinished.length > 0 && (
+            <button className="btn" onClick={() => onRetry(unfinished)}>
+              Re-run {unfinished.length} unfinished {unfinished.length === 1 ? "task" : "tasks"}
+            </button>
+          )}
+          <button className={onRetry && unfinished.length > 0 ? "btn btn-ghost" : "btn"} onClick={onReset}>
             Scan another site
           </button>
           <button className="btn btn-ghost" onClick={download}>

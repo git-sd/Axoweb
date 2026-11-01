@@ -33,7 +33,8 @@ const MIN_TASK_MS = 25_000;
 //   { type: "progress", task, text }        an agent did something
 //   { type: "task", task, ok }              an agent finished
 //   { type: "checks", checks }              the verified site checks finished
-//   { type: "result", result, cached? }     final ScanResult (cached: replayed from a recent scan)
+//   { type: "result", result, cached?, scanId? }  final ScanResult (cached: replayed from a recent scan;
+//                                           scanId lets the page re-run just the unfinished tasks)
 //   { type: "error", message }
 export type ScanEvent =
   | { type: "skipped"; task: number }
@@ -42,7 +43,7 @@ export type ScanEvent =
   | { type: "progress"; task: number; text: string }
   | { type: "task"; task: number; ok: boolean }
   | { type: "checks"; checks: { label: string; ok: boolean; detail: string }[] }
-  | { type: "result"; result: ScanResult; cached?: boolean }
+  | { type: "result"; result: ScanResult; cached?: boolean; scanId?: string }
   | { type: "error"; message: string };
 
 const STREAM_HEADERS = { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" };
@@ -90,6 +91,18 @@ async function pool<T, R>(items: T[], limit: number, fn: (item: T, index: number
   return out;
 }
 
+// The last few scans, kept in memory so the unfinished tasks of one can be re-run on their own and
+// merged into the same result, without paying for the tasks that already finished.
+type KeptScan = { url: string; type: string; description?: string; outcomes: TaskOutcome[]; checks: Check[] };
+const kept = new Map<string, KeptScan>();
+function keep(scan: KeptScan, replacing?: string) {
+  if (replacing) kept.delete(replacing);
+  const id = crypto.randomUUID();
+  kept.set(id, scan);
+  while (kept.size > 5) kept.delete(kept.keys().next().value as string);
+  return id;
+}
+
 export async function POST(req: Request) {
   // Callers such as the MCP server can bring their own TinyFish key; their scan then runs on
   // their account, so it does not touch this site's scan budget.
@@ -99,11 +112,25 @@ export async function POST(req: Request) {
     return Response.json({ error: "No TinyFish API key is set. Add TINYFISH_API_KEY and restart, or send your own in the X-TinyFish-Key header." }, { status: 503 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as { url?: unknown; type?: unknown; description?: unknown };
-  const url = normaliseUrl(body.url);
+  const body = (await req.json().catch(() => ({}))) as { url?: unknown; type?: unknown; description?: unknown; retry?: { scanId?: unknown; tasks?: unknown } };
+
+  // Re-running only the unfinished tasks of an earlier scan: take the site from that scan.
+  const retryId = typeof body.retry?.scanId === "string" ? body.retry.scanId : "";
+  const previous = retryId ? kept.get(retryId) : undefined;
+  if (body.retry && !previous) {
+    return Response.json({ error: "That scan is no longer available, so only its unfinished tasks cannot be re-run. Run a full scan again." }, { status: 410 });
+  }
+  const retryTasks = previous
+    ? (Array.isArray(body.retry?.tasks) ? (body.retry.tasks as unknown[]) : []).filter(
+        (i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < previous.outcomes.length && !!previous.outcomes[i as number].inconclusive,
+      )
+    : null;
+  if (previous && !retryTasks?.length) return Response.json({ error: "Every task already has a result." }, { status: 400 });
+
+  const url = previous ? previous.url : normaliseUrl(body.url);
   if (!url) return Response.json({ error: "Enter a valid public address, like yoursite.com" }, { status: 400 });
-  const type = typeof body.type === "string" ? body.type : "custom";
-  const description = type === "custom" && typeof body.description === "string" ? body.description.trim() : undefined;
+  const type = previous ? previous.type : typeof body.type === "string" ? body.type : "custom";
+  const description = previous ? previous.description : type === "custom" && typeof body.description === "string" ? body.description.trim() : undefined;
 
   if (!sameOrigin(req)) return Response.json({ error: "Scans can only be started from Axolotl itself." }, { status: 403 });
 
@@ -112,7 +139,7 @@ export async function POST(req: Request) {
   const line = (e: ScanEvent) => encoder.encode(JSON.stringify(e) + "\n");
 
   // Same site scanned recently: replay that result instead of paying for a new scan.
-  const hit = cached(url, type, description);
+  const hit = previous ? null : cached(url, type, description);
   if (hit) {
     const replay = new ReadableStream({
       start(controller) {
@@ -230,16 +257,23 @@ export async function POST(req: Request) {
 
       try {
         // Free, fast checks run alongside the agents; a failure there never sinks the scan.
-        const checksDone = runChecks(url, type)
-          .catch((): Check[] => [])
+        // A re-run keeps the checks from the earlier scan; they do not change and cost nothing.
+        const checksDone = (previous ? Promise.resolve(previous.checks) : runChecks(url, type).catch((): Check[] => []))
           .then((checks) => {
             send({ type: "checks", checks: checks.map((c) => ({ label: c.label, ok: c.ok, detail: c.detail })) });
             return checks;
           });
         // Run only as many tasks as the time pays for, the most important first. The rest are
         // reported as not run, and their weight goes to the tasks that did run.
-        const fit = tasksThatFit(tasks.length, CONCURRENCY, BUDGET_MS, MIN_AGENT_MS);
-        const { run, skipped } = chooseTasks(tasks.map((t) => t.weight), fit);
+        let run: number[];
+        let skipped: number[];
+        if (retryTasks) {
+          run = retryTasks;
+          skipped = [];
+        } else {
+          const fit = tasksThatFit(tasks.length, CONCURRENCY, BUDGET_MS, MIN_AGENT_MS);
+          ({ run, skipped } = chooseTasks(tasks.map((t) => t.weight), fit));
+        }
         toStart = run.length;
         const notRun = (i: number): TaskOutcome => {
           send({ type: "skipped", task: i });
@@ -256,7 +290,7 @@ export async function POST(req: Request) {
             error: "Not run: this server's time limit fits fewer tasks than this scan has.",
           };
         };
-        const outcomes: TaskOutcome[] = new Array(tasks.length);
+        const outcomes: TaskOutcome[] = previous ? previous.outcomes.slice() : new Array(tasks.length);
         skipped.forEach((i) => (outcomes[i] = notRun(i)));
         const [ranOrder, checks] = await Promise.all([pool(run, CONCURRENCY, (i) => runTask(tasks[i], i)), checksDone]);
         run.forEach((taskIndex, k) => (outcomes[taskIndex] = ranOrder[k]));
@@ -266,7 +300,8 @@ export async function POST(req: Request) {
           const result = scoreOutcomes(type, outcomes, checks);
           result.stats = { ...(result.stats ?? { agents: outcomes.length, steps: 0 }), seconds: Math.round((Date.now() - startedAt) / 1000) };
           if (!ownKey) remember(url, type, description, result);
-          send({ type: "result", result });
+          const scanId = keep({ url, type, description, outcomes, checks }, retryId || undefined);
+          send({ type: "result", result, scanId });
         }
       } catch (err) {
         send({ type: "error", message: err instanceof Error ? err.message : "Scan failed." });
