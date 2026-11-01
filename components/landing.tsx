@@ -241,41 +241,9 @@ function Hero({ onLanded }: { onLanded: (landed: boolean) => void }) {
   );
 }
 
-// Faint bubbles drifting up through the dark "pond" behind the intro. Positions are fixed
-// (not random) so server and browser render the same thing. Few, slow and low-contrast on
-// purpose: ambient, never competing with the word or the axolotl.
-const BUBBLES: { left: string; size: number; dur: number; delay: number; sway: number }[] = [
-  { left: "6%", size: 22, dur: 15, delay: 0, sway: 18 },
-  { left: "16%", size: 40, dur: 21, delay: 6, sway: -26 },
-  { left: "27%", size: 16, dur: 17, delay: 11, sway: 14 },
-  { left: "41%", size: 28, dur: 19, delay: 3, sway: -16 },
-  { left: "58%", size: 20, dur: 16, delay: 9, sway: 20 },
-  { left: "71%", size: 48, dur: 23, delay: 1, sway: -30 },
-  { left: "83%", size: 26, dur: 18, delay: 7, sway: 18 },
-  { left: "93%", size: 34, dur: 20, delay: 13, sway: -20 },
-];
-
 function HeroFloaters() {
   return (
     <>
-      <div className="bubbles" aria-hidden="true">
-        {BUBBLES.map((b, i) => (
-          <span
-            key={i}
-            className="bubble"
-            style={
-              {
-                left: b.left,
-                width: b.size,
-                height: b.size,
-                animationDuration: `${b.dur}s`,
-                animationDelay: `-${b.delay}s`,
-                "--sway": `${b.sway}px`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-      </div>
       <div className="hero-cue">
         <span>Scroll to dive in</span>
         <motion.span
