@@ -2331,3 +2331,17 @@ select {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Optional "use your own TinyFish key" box under the address field. */
+.keybox {
+  margin: 4px 0 20px;
+  text-align: center;
+}
+
+.keybox .field {
+  margin-top: 12px;
+}
+
+.keybox .hint {
+  margin-top: 8px;
+}

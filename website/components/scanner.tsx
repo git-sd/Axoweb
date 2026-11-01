@@ -12,7 +12,7 @@ import Axolotl from "@/components/axolotl";
 import Report from "@/components/report";
 import LiveView from "@/components/live-view";
 import { GITHUB_URL } from "@/lib/links";
-import { PRESETS, SITES, detect, total, verdictOf } from "@/lib/sites";
+import { PRESETS, SITES, detect, verdictOf } from "@/lib/sites";
 import { tasksFor, type ScanResult } from "@/lib/scan";
 import type { ScanEvent } from "@/app/api/scan/route";
 
@@ -56,6 +56,9 @@ export default function Scanner() {
   // Latest thing each agent reported doing, shown under its task while it runs.
   const [steps, setSteps] = useState<string[]>([]);
   const [watch, setWatch] = useState<string[]>([]);
+  // The visitor's own TinyFish key: held in memory only, never stored in the browser or on our server.
+  const [userKey, setUserKey] = useState("");
+  const [keyOpen, setKeyOpen] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   // Verified site checks; null while they are still running.
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null);
@@ -94,24 +97,6 @@ export default function Scanner() {
     setRevealed(true);
   }
 
-  // Replays the bundled sample for this site type (used when the server has no TinyFish key).
-  async function replaySample(h: string) {
-    setLive(false);
-    setTitles(site.tasks.map((t) => t[0]));
-    setStates(site.tasks.map(() => "idle"));
-    setStatus(`Opening ${h}…`);
-    await sleep(1000);
-    for (let i = 0; i < site.tasks.length; i++) {
-      setStatus(i === 0 ? "Reading the page like an agent would…" : "Trying real tasks…");
-      setStates((s) => s.map((v, j) => (j === i ? "run" : v)));
-      await sleep(1300);
-      setStates((s) => s.map((v, j) => (j === i ? (site.tasks[i][2] ? "pass" : "fail") : v)));
-    }
-    setStatus("Scoring the results…");
-    await sleep(900);
-    await reveal({ type: key, tasks: site.tasks, dims: site.dims, fixes: site.fixes, score: total(site) });
-  }
-
   // Runs the TinyFish agents and site checks through /api/scan and follows their progress live.
   async function scan(h: string) {
     if (running.current) return;
@@ -130,11 +115,14 @@ export default function Scanner() {
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(userKey.trim() ? { "X-TinyFish-Key": userKey.trim() } : {}) },
         body: JSON.stringify({ url: url.trim(), type: key, description: sel === "own" ? desc : undefined }),
       });
       if (res.status === 503) {
-        await replaySample(h);
+        // No key on the server and none from the visitor: never invent results.
+        setErr("This site has no TinyFish key of its own. Add your own key below to run a live scan.");
+        setKeyOpen(true);
+        setPhase("address");
         return;
       }
       if (!res.ok || !res.body) {
@@ -334,6 +322,28 @@ export default function Scanner() {
                 transition={{ duration: 0.4 }}
               />
               <p className="err" id="address-err" role="alert">{err}</p>
+              <div className="keybox">
+                <button type="button" className="btn-quiet" aria-expanded={keyOpen} aria-controls="tf-key" onClick={() => setKeyOpen((o) => !o)}>
+                  {keyOpen ? "Hide TinyFish key" : "Use your own TinyFish key"}
+                </button>
+                {keyOpen && (
+                  <div id="tf-key">
+                    <input
+                      className="field"
+                      type="password"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={userKey}
+                      onChange={(e) => setUserKey(e.target.value)}
+                      aria-label="Your TinyFish API key"
+                      placeholder="sk-tinyfish-..."
+                    />
+                    <p className="hint">
+                      The scan then runs on your TinyFish account. Your key goes straight to TinyFish with this scan, is not saved anywhere, and is forgotten when you close or reload this page.
+                    </p>
+                  </div>
+                )}
+              </div>
               <div className="actions">
                 <button className="btn-quiet" onClick={() => setPhase("pick")}>← Back</button>
                 <button className="btn" onClick={submit}>Run scan</button>
