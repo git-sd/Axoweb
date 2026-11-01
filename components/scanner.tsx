@@ -243,11 +243,12 @@ export default function Scanner() {
                       className="type"
                       onClick={() => setSel(on ? null : k)}
                       aria-pressed={on}
+                      disabled={k === "own"}
                       data-own={k === "own"}
                       initial={{ opacity: 0, y: 40, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: on ? 1.04 : 1 }}
-                      whileHover={{ y: -6, rotate: i % 2 ? -1.5 : 1.5 }}
-                      whileTap={{ scale: 0.94 }}
+                      whileHover={k === "own" ? undefined : { y: -6, rotate: i % 2 ? -1.5 : 1.5 }}
+                      whileTap={k === "own" ? undefined : { scale: 0.94 }}
                       transition={{ ...pop, delay: i * 0.05 }}
                     >
                       <motion.span
@@ -258,7 +259,7 @@ export default function Scanner() {
                         <TypeArt kind={k} />
                       </motion.span>
                       <b>{k === "own" ? "Describe it yourself" : SITES[k].name}</b>
-                      <small>{k === "own" ? "Something else? Tell us." : SITES[k].sub}</small>
+                      <small>{k === "own" ? "Coming soon" : SITES[k].sub}</small>
                     </motion.button>
                   );
                 })}

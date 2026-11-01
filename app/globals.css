@@ -2200,3 +2200,15 @@ select {
 .mcp-install .mcp-code {
   white-space: pre;
 }
+
+/* "Describe it yourself" is planned, not built yet: shown, but not selectable. */
+.type:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.type:disabled small {
+  font-weight: 800;
+  color: var(--coral);
+}

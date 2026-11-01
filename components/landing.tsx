@@ -518,7 +518,7 @@ function StepScore() {
 }
 
 const STEPS: [string, string, () => React.ReactElement][] = [
-  ["Describe your site", "Pick booking, e-commerce, SaaS, docs or forms, or describe it. That decides which tasks we test.", StepPick],
+  ["Pick your site type", "Pick booking, e-commerce, SaaS, docs or forms. That decides which tasks we test.", StepPick],
   ["Enter the address", "Just the URL. Nothing to install, no code to add.", StepAddress],
   ["Agents try it", "TinyFish web agents attempt three real tasks, the way a customer's agent would.", StepAgents],
   ["Get your score", "What worked, what broke, and the fixes worth the most points.", StepScore],
