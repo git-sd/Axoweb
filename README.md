@@ -35,3 +35,5 @@ npm run dev
 Both need Node 18+. Scans need a TinyFish API key from [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys); never commit it.
 
 Agents never submit, pay, book, sign up or type personal details on the sites they test.
+
+The name "Axolotl" and all three parts are described in the table above; each folder has its own README with details.
