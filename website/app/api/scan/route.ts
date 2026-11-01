@@ -29,6 +29,7 @@ const MIN_TASK_MS = 25_000;
 // Stream events, one JSON object per line:
 //   { type: "skipped", task }               a task that does not fit in this scan's time, not run
 //   { type: "started", task }               an agent began working (it may have been waiting)
+//   { type: "watch", task, url }            a live view of that agent's browser (open it to watch)
 //   { type: "progress", task, text }        an agent did something
 //   { type: "task", task, ok }              an agent finished
 //   { type: "checks", checks }              the verified site checks finished
@@ -37,6 +38,7 @@ const MIN_TASK_MS = 25_000;
 export type ScanEvent =
   | { type: "skipped"; task: number }
   | { type: "started"; task: number }
+  | { type: "watch"; task: number; url: string }
   | { type: "progress"; task: number; text: string }
   | { type: "task"; task: number; ok: boolean }
   | { type: "checks"; checks: { label: string; ok: boolean; detail: string }[] }
@@ -183,6 +185,10 @@ export async function POST(req: Request) {
               runId = event.run_id;
               // TinyFish may hold a run in its own queue, so announce it only when it truly begins.
               send({ type: "started", task: i });
+            }
+            if (event.type === "STREAMING_URL") {
+              // Only ever pass on a plain https address, since the page turns it into a link.
+              if (/^https:\/\//i.test(event.streaming_url)) send({ type: "watch", task: i, url: event.streaming_url });
             }
             if (event.type === "PROGRESS") {
               outcome.steps++;

@@ -10,6 +10,7 @@ import { GithubIcon } from "@/components/github-link";
 import TypeArt from "@/components/type-art";
 import Axolotl from "@/components/axolotl";
 import Report from "@/components/report";
+import LiveView from "@/components/live-view";
 import { GITHUB_URL } from "@/lib/links";
 import { PRESETS, SITES, detect, total, verdictOf } from "@/lib/sites";
 import { tasksFor, type ScanResult } from "@/lib/scan";
@@ -54,6 +55,7 @@ export default function Scanner() {
   const [titles, setTitles] = useState<string[]>([]);
   // Latest thing each agent reported doing, shown under its task while it runs.
   const [steps, setSteps] = useState<string[]>([]);
+  const [watch, setWatch] = useState<string[]>([]);
   const [result, setResult] = useState<ScanResult | null>(null);
   // Verified site checks; null while they are still running.
   const [checks, setChecks] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null);
@@ -122,6 +124,7 @@ export default function Scanner() {
     setTitles(tasks.map((t) => t.title));
     setStates(tasks.map(() => "queued"));
     setSteps(tasks.map(() => ""));
+    setWatch(tasks.map(() => ""));
     setChecks(null);
     setStatus(`Sending agents to ${h}…`);
     try {
@@ -155,6 +158,8 @@ export default function Scanner() {
           if (e.type === "progress") {
             setSteps((s) => s.map((v, j) => (j === e.task ? e.text : v)));
             setStatus(e.text);
+          } else if (e.type === "watch") {
+            setWatch((w) => w.map((v, j) => (j === e.task ? e.url : v)));
           } else if (e.type === "checks") {
             setChecks(e.checks);
           } else if (e.type === "skipped") {
@@ -408,6 +413,7 @@ export default function Scanner() {
                   </motion.div>
                 )}
               </div>
+              {live && <LiveView titles={titles} states={states} watch={watch} />}
             </motion.div>
           )}
 
