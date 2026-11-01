@@ -9,6 +9,7 @@ import TinyfishLogo from "@/components/tinyfish-logo";
 import AxolotlMark from "@/components/axolotl-mark";
 import { DIMS } from "@/lib/sites";
 import UrlForm from "@/components/url-form";
+import McpInstall from "@/components/mcp-install";
 import Axolotl from "@/components/axolotl";
 import InstallLine, { GithubIcon } from "@/components/github-link";
 import { GITHUB_URL } from "@/lib/links";
@@ -568,7 +569,7 @@ function Get() {
     ["A score out of 100", "One number for how agent-friendly your site is, with a plain verdict."],
     ["Four dimensions", "Discoverability, Navigability, Actionability and Reliability."],
     ["Task by task", "Pass or fail for every job the agents tried."],
-    ["Ranked fixes", "Every problem, ordered by how many points fixing it earns you."],
+    ["Ranked fixes", "Every problem, ranked by priority and how much fixing it would move your score."],
   ];
   return (
     <section id="get" className="section">
@@ -592,6 +593,41 @@ function Get() {
           </ul>
           <ScoreCard />
         </div>
+      </div>
+    </section>
+  );
+}
+
+function ForAgents() {
+  return (
+    <section id="agents" className="section">
+      <div className="wrap">
+        <Heading eyebrow="For agents">Let your own agent run the scan.</Heading>
+        <motion.div
+          className="mcp"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={inView}
+          transition={pop}
+        >
+          <div className="mcp-copy">
+            <p>
+              Axolotl ships an MCP server, so Claude Code, Codex, Cursor, Gemini CLI and other agents can check a site without opening this page. Pick your tool, paste the config, and teach the model when to use it.
+            </p>
+            <ul>
+              <li>
+                <b>axolotl_check</b> is free and takes seconds. It runs the 26 site checks and returns a score with fixes.
+              </li>
+              <li>
+                <b>axolotl_scan</b> sends TinyFish agents to try real tasks. It runs on your own TinyFish key.
+              </li>
+            </ul>
+            <a className="btn" href={`${GITHUB_URL}/tree/main/mcp`} target="_blank" rel="noreferrer">
+              Set up the MCP server
+            </a>
+          </div>
+          <McpInstall />
+        </motion.div>
       </div>
     </section>
   );
@@ -645,6 +681,7 @@ export default function Landing() {
         <Hero onLanded={setNavOn} />
         <Tasks />
         <How />
+        <ForAgents />
         <Get />
         <Cta />
       </main>

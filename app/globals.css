@@ -2063,3 +2063,140 @@ select {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* ---------- for agents (MCP) ---------- */
+.mcp {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 32px;
+  align-items: center;
+  margin-top: 40px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--pond-2);
+  text-align: left;
+}
+
+.mcp-copy p {
+  margin: 0 0 16px;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.mcp-copy ul {
+  margin: 0 0 24px;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.mcp-copy li + li {
+  margin-top: 8px;
+}
+
+.mcp-copy b {
+  color: var(--body);
+}
+
+.mcp-code {
+  margin: 0;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--pond);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+@media (max-width: 800px) {
+  .mcp {
+    grid-template-columns: 1fr;
+    padding: 22px 18px;
+  }
+}
+
+.mcp-install {
+  min-width: 0;
+}
+
+.mcp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mcp-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.mcp-tabs button:hover {
+  color: var(--body);
+}
+
+.mcp-tabs button[aria-selected="true"] {
+  border-color: var(--coral);
+  background: var(--coral);
+  color: var(--ink);
+}
+
+.mcp-tabs button:focus-visible,
+.mcp-copy-btn:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+
+.mcp-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.mcp-teach-bar {
+  margin-top: 22px;
+}
+
+.mcp-copy-btn {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--coral);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mcp-copy-btn:hover {
+  background: var(--coral);
+  color: var(--ink);
+}
+
+.mcp-install .mcp-code {
+  white-space: pre;
+}
