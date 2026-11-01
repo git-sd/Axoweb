@@ -4,3 +4,5 @@
 !.env.example
 node_modules/
 .DS_Store
+
+# Only the repository root is covered here; every folder also has its own .gitignore.
