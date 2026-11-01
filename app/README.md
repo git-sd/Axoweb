@@ -78,3 +78,7 @@ The limits are kept in server memory. On hosts that run several instances (such 
 ## Use it from an AI agent (MCP)
 
 `mcp/` is an MCP server that lets Claude Code, Cursor and other agents check a site: `axolotl_check` is free and takes seconds, `axolotl_scan` runs the full TinyFish scan. See [`mcp/README.md`](mcp/README.md) for setup. The free check is also available as `POST /api/check` with `{ "url": "...", "type": "shop" }`.
+
+## Icon
+
+The exe uses the default Electron icon. To brand it, add `electron/icon.ico` and set `build.win.icon` in `package.json`.
