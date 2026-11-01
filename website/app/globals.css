@@ -2356,3 +2356,11 @@ select {
 .mcp-note code {
   color: var(--body);
 }
+
+/* On phones and touch screens the hero hid a "Choose a letter" dropdown under the title. The letters
+   themselves are tappable, so the dropdown is not needed there. */
+@media (any-pointer: coarse), (max-width: 760px) {
+  [data-gp-touch-picker] {
+    display: none !important;
+  }
+}
