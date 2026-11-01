@@ -241,38 +241,41 @@ function Hero({ onLanded }: { onLanded: (landed: boolean) => void }) {
   );
 }
 
-// Task results scattered around the word in the opening frame, like a scan in progress.
-// `top` is placed relative to the word (--gp-word-top / --gp-word-bottom, set by the portal).
-const FLOATERS: { label: string; ok: boolean; top: string; side: "left" | "right"; at: string; tilt: number; wide?: boolean }[] = [
-  { label: "Book a table for four", ok: true, top: "calc(var(--gp-word-top,35%) * .42)", side: "left", at: "9%", tilt: -4 },
-  { label: "Find the refund policy", ok: true, top: "calc(var(--gp-word-top,35%) * .3)", side: "right", at: "26%", tilt: 3, wide: true },
-  { label: "Check out as a guest", ok: false, top: "calc(var(--gp-word-top,35%) * .6)", side: "right", at: "8%", tilt: 5 },
-  { label: "Add the medium to cart", ok: true, top: "calc(var(--gp-word-bottom,60%) + 96px)", side: "left", at: "11%", tilt: 4 },
-  { label: "Submit the quote form", ok: false, top: "calc(var(--gp-word-bottom,60%) + 130px)", side: "right", at: "10%", tilt: -3, wide: true },
+// Faint bubbles drifting up through the dark "pond" behind the intro. Positions are fixed
+// (not random) so server and browser render the same thing. Few, slow and low-contrast on
+// purpose: ambient, never competing with the word or the axolotl.
+const BUBBLES: { left: string; size: number; dur: number; delay: number; sway: number }[] = [
+  { left: "6%", size: 22, dur: 15, delay: 0, sway: 18 },
+  { left: "16%", size: 40, dur: 21, delay: 6, sway: -26 },
+  { left: "27%", size: 16, dur: 17, delay: 11, sway: 14 },
+  { left: "41%", size: 28, dur: 19, delay: 3, sway: -16 },
+  { left: "58%", size: 20, dur: 16, delay: 9, sway: 20 },
+  { left: "71%", size: 48, dur: 23, delay: 1, sway: -30 },
+  { left: "83%", size: 26, dur: 18, delay: 7, sway: 18 },
+  { left: "93%", size: 34, dur: 20, delay: 13, sway: -20 },
 ];
 
 function HeroFloaters() {
   return (
     <>
-      {FLOATERS.map((f, i) => (
-        <motion.div
-          key={f.label}
-          className={f.wide ? "hero-chip wide-only" : "hero-chip"}
-          style={{ top: f.top, [f.side]: f.at }}
-          initial={{ opacity: 0, scale: 0.4, rotate: f.tilt * 3 }}
-          animate={{ opacity: 1, scale: 1, rotate: f.tilt }}
-          transition={{ type: "spring", stiffness: 260, damping: 12, delay: 0.4 + i * 0.12 }}
-        >
-          <motion.span
-            className="hero-chip-inner"
-            animate={{ y: [0, -7, 0] }}
-            transition={{ duration: 3 + i * 0.4, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <span className="hero-chip-dot" data-ok={f.ok}>{f.ok ? "✓" : "✕"}</span>
-            {f.label}
-          </motion.span>
-        </motion.div>
-      ))}
+      <div className="bubbles" aria-hidden="true">
+        {BUBBLES.map((b, i) => (
+          <span
+            key={i}
+            className="bubble"
+            style={
+              {
+                left: b.left,
+                width: b.size,
+                height: b.size,
+                animationDuration: `${b.dur}s`,
+                animationDelay: `-${b.delay}s`,
+                "--sway": `${b.sway}px`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
       <div className="hero-cue">
         <span>Scroll to dive in</span>
         <motion.span
@@ -678,7 +681,7 @@ export default function Landing() {
         <Cta />
       </main>
       <footer className="footer">
-        <span>axolotl × tinyfish · Prototype. Scans are bundled samples and do not call TinyFish yet.</span>
+        <span>axolotl × tinyfish · Every scan is run by real TinyFish web agents.</span>
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="gh-link">
           <GithubIcon size={15} />
           GitHub
