@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Axolotl</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #0c0d10; color: #f6dcd8; font: 16px/1.6 "Nunito", "Segoe UI", system-ui, sans-serif; }
+  main { width: 100%; max-width: 480px; padding: 32px; border: 1px solid rgba(246,220,216,.14); border-radius: 20px; background: #15171b; }
+  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 900; }
+  p { margin: 0 0 20px; color: rgba(246,220,216,.7); }
+  label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: rgba(246,220,216,.7); }
+  input { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid rgba(246,220,216,.25); border-radius: 12px; background: #0c0d10; color: inherit; font: inherit; }
+  input:focus-visible, button:focus-visible { outline: 2px solid #ee7f95; outline-offset: 2px; }
+  button { width: 100%; min-height: 48px; margin-top: 16px; border: 0; border-radius: 999px; background: #ee7f95; color: #3a0f1f; font: inherit; font-weight: 900; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .err { min-height: 24px; margin: 10px 0 0; color: #ff8a8a; font-size: 14px; }
+  small { display: block; margin-top: 18px; color: rgba(246,220,216,.55); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Welcome to Axolotl</h1>
+  <p>Axolotl sends TinyFish web agents to a site to see how well an AI agent can use it. Paste your TinyFish API key to begin.</p>
+  <form id="f">
+    <label for="k">TinyFish API key</label>
+    <input id="k" type="password" autocomplete="off" spellcheck="false" placeholder="sk-tinyfish-..." autofocus>
+    <p class="err" id="e" role="alert"></p>
+    <button id="b" type="submit">Save and continue</button>
+  </form>
+  <small>Scans run on your own TinyFish account. The key is stored encrypted on this computer only and is sent to nobody except TinyFish.</small>
+</main>
+<script>
+  const f = document.getElementById("f"), k = document.getElementById("k"), e = document.getElementById("e"), b = document.getElementById("b");
+  f.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    b.disabled = true; e.textContent = "";
+    const r = await window.axolotl.saveKey(k.value);
+    if (!r.ok) { e.textContent = r.message; b.disabled = false; } else { b.textContent = "Starting..."; }
+  });
+</script>
+</body>
+</html>

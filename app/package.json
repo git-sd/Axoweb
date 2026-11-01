@@ -1,0 +1,55 @@
+{
+  "name": "axolotl",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "bundle": "next build && node scripts/bundle-server.mjs",
+    "desktop": "electron .",
+    "dist": "npm run bundle && electron-builder --win --dir",
+    "installer": "npm run bundle && electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "@tiny-fish/sdk": "^0.11.0",
+    "next": "16.4.3",
+    "node-html-parser": "9.0.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "description": "Axolotl: see how well AI agents can use your website. Desktop app.",
+  "main": "electron/main.js",
+  "author": "git-sd",
+  "build": {
+    "appId": "dev.axolotl.app",
+    "productName": "Axolotl",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "dir"
+      ]
+    },
+    "asar": true,
+    "afterPack": "scripts/after-pack.js"
+  }
+}
