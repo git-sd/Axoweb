@@ -1,3 +1,6 @@
+<h1 align="center"><a href="https://axolotl-eosin.vercel.app">axolotl-eosin.vercel.app</a></h1>
+<p align="center"><b>Live website: try Axolotl here</b></p>
+
 # Axolotl
 
 Agent experience optimization: SEO for AI agents. Axolotl sends real [TinyFish](https://tinyfish.ai) web agents to a website, has them try the tasks that matter for that kind of site (booking, e-commerce, SaaS, docs, lead-gen forms), runs 26 free checks on its files and HTML, and scores it out of 100 with ranked fixes.
