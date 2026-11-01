@@ -8,13 +8,14 @@ import TinyfishLogo from "@/components/tinyfish-logo";
 import AxolotlMark from "@/components/axolotl-mark";
 import { GithubIcon } from "@/components/github-link";
 import TypeArt from "@/components/type-art";
+import Report from "@/components/report";
 import { GITHUB_URL } from "@/lib/links";
-import { DIMS, PRESETS, SITES, detect, total, verdictOf } from "@/lib/sites";
+import { PRESETS, SITES, detect, total, verdictOf } from "@/lib/sites";
 import { tasksFor, type ScanResult } from "@/lib/scan";
 import type { ScanEvent } from "@/app/api/scan/route";
 
 type Phase = "pick" | "address" | "loading" | "results";
-type TaskState = "idle" | "run" | "pass" | "fail";
+type TaskState = "idle" | "queued" | "run" | "pass" | "fail";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,19 +27,6 @@ const phaseMotion = {
   exit: { opacity: 0, y: -30, scale: 0.96 },
   transition: pop,
 };
-
-// "7.3 / 25" for a row's marks; nothing for sample results or items that carry no marks.
-function Marks({ earned, max }: { earned?: number; max?: number }) {
-  if (earned === undefined || !max) return null;
-  const full = earned >= max - 0.05;
-  return (
-    <span className="marks" data-full={full} title="Marks earned out of marks available, from a total of 100">
-      <b>{earned}</b> / {max}
-    </span>
-  );
-}
-
-const round = (n: number) => Math.round(n * 10) / 10;
 
 function hostOf(u: string) {
   try {
@@ -121,7 +109,7 @@ export default function Scanner() {
     await reveal({ type: key, tasks: site.tasks, dims: site.dims, fixes: site.fixes, score: total(site) });
   }
 
-  // Runs the three TinyFish agents through /api/scan and follows their progress live.
+  // Runs the TinyFish agents and site checks through /api/scan and follows their progress live.
   async function scan(h: string) {
     if (running.current) return;
     running.current = true;
@@ -131,10 +119,10 @@ export default function Scanner() {
     setLive(true);
     setFromCache(false);
     setTitles(tasks.map((t) => t.title));
-    setStates(tasks.map(() => "run"));
+    setStates(tasks.map(() => "queued"));
     setSteps(tasks.map(() => ""));
     setChecks(null);
-    setStatus(`Sending 3 agents to ${h}…`);
+    setStatus(`Sending 6 agents to ${h}…`);
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
@@ -168,6 +156,8 @@ export default function Scanner() {
             setStatus(e.text);
           } else if (e.type === "checks") {
             setChecks(e.checks);
+          } else if (e.type === "started") {
+            setStates((s) => s.map((v, j) => (j === e.task && v === "queued" ? "run" : v)));
           } else if (e.type === "task") {
             setStates((s) => s.map((v, j) => (j === e.task ? (e.ok ? "pass" : "fail") : v)));
           } else if (e.type === "result") {
@@ -339,7 +329,7 @@ export default function Scanner() {
                 <button className="btn-quiet" onClick={() => setPhase("pick")}>← Back</button>
                 <button className="btn" onClick={submit}>Run scan</button>
               </div>
-              <p className="fineprint">Three TinyFish agents will try real tasks on this site. A scan takes a minute or two. They never submit, pay, book or sign up.</p>
+              <p className="fineprint">Six TinyFish agents will each try a real task on this site, and 26 checks will read its files. A scan takes about three to five minutes. The agents never submit, pay, book or sign up.</p>
             </motion.div>
           )}
 
@@ -397,6 +387,7 @@ export default function Scanner() {
                       </motion.span>
                       <span className="check-text">
                         {title}
+                        {live && st === "queued" && <small>Waiting for its turn</small>}
                         {live && st === "run" && steps[i] && <small>{steps[i]}</small>}
                       </span>
                     </motion.div>
@@ -419,7 +410,7 @@ export default function Scanner() {
                       <small>
                         {checks
                           ? `${checks.filter((c) => c.ok).length} of ${checks.length} passed`
-                          : "robots.txt, structured data, forms, content without JavaScript"}
+                          : "26 checks: robots.txt, structured data, forms, links, content without JavaScript"}
                       </small>
                     </span>
                   </motion.div>
@@ -466,139 +457,7 @@ export default function Scanner() {
                 <span className="tag">{host} · {shownSite.name}{live ? "" : " · sample"}</span>
               </div>
 
-              {revealed && (
-                <div>
-                  <div className="result-grid">
-                    <motion.section
-                      className="card"
-                      initial={{ opacity: 0, y: 50, rotate: -3 }}
-                      animate={{ opacity: 1, y: 0, rotate: 0 }}
-                      whileHover={{ y: -4, rotate: -0.5 }}
-                      transition={pop}
-                    >
-                      <div className="card-label">
-                        Agent tasks
-                        {result?.tasks[0]?.[4] !== undefined && (
-                          <span className="card-total">
-                            {round(result.tasks.reduce((a, t) => a + (t[3] ?? 0), 0))} / {round(result.tasks.reduce((a, t) => a + (t[4] ?? 0), 0))} marks
-                          </span>
-                        )}
-                      </div>
-                      {result?.tasks.map((t, i) => (
-                        <motion.div
-                          key={t[0]}
-                          className="task-row"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ ...pop, delay: 0.15 + i * 0.08 }}
-                        >
-                          <span className="dot" data-dot={t[2] ? "pass" : "fail"}>
-                            {t[2] ? "✓" : "✕"}
-                          </span>
-                          <div>
-                            <div className="t">{t[0]}</div>
-                            <div className="d">{t[1]}</div>
-                          </div>
-                          <Marks earned={t[3]} max={t[4]} />
-                        </motion.div>
-                      ))}
-                    </motion.section>
-                    <motion.section
-                      className="card"
-                      initial={{ opacity: 0, y: 50, rotate: 3 }}
-                      animate={{ opacity: 1, y: 0, rotate: 0 }}
-                      whileHover={{ y: -4, rotate: 0.5 }}
-                      transition={{ ...pop, delay: 0.08 }}
-                    >
-                      <div className="card-label">Score breakdown</div>
-                      {DIMS.map((d, i) => (
-                        <div className="dim" key={d}>
-                          <div className="dim-head">
-                            <span>
-                              {d}
-                              {result?.weights && <small className="dim-weight">{Math.round(result.weights[i] * 100)}% of score</small>}
-                            </span>
-                            <span>{result?.dims[i]}</span>
-                          </div>
-                          <div className="bar">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${result?.dims[i] ?? 0}%` }}
-                              transition={{ type: "spring", stiffness: 70, damping: 9, delay: 0.2 + i * 0.12 }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </motion.section>
-                  </div>
-                  {!!result?.checks?.length && (
-                    <motion.section
-                      className="card site-checks"
-                      initial={{ opacity: 0, y: 50 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ ...pop, delay: 0.12 }}
-                    >
-                      <div className="card-label">
-                        Site checks · {result.checks.filter((c) => c.ok).length} of {result.checks.length} passed
-                        {result.checks.some((c) => c.max) && (
-                          <span className="card-total">
-                            {round(result.checks.reduce((a, c) => a + (c.marks ?? 0), 0))} / {round(result.checks.reduce((a, c) => a + (c.max ?? 0), 0))} marks
-                          </span>
-                        )}
-                      </div>
-                      <div className="site-checks-grid">
-                        {result.checks.map((c, i) => (
-                          <motion.div
-                            key={c.label}
-                            className="task-row"
-                            initial={{ opacity: 0, x: -16 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ ...pop, delay: 0.2 + i * 0.05 }}
-                          >
-                            <span className="dot" data-dot={c.ok ? "pass" : "fail"}>
-                              {c.ok ? "✓" : "✕"}
-                            </span>
-                            <div>
-                              <div className="t">{c.label}</div>
-                              <div className="d">{c.detail}</div>
-                            </div>
-                            <Marks earned={c.marks} max={c.max} />
-                          </motion.div>
-                        ))}
-                      </div>
-                    </motion.section>
-                  )}
-                  <section className="card">
-                    <div className="card-label">Ranked fixes</div>
-                    {result?.fixes.length === 0 && <p className="verdict-sub">No problems found.</p>}
-                    {result?.fixes.map((f) => (
-                      <div key={f[1]} className="fix">
-                        <span className="pri" data-priority={f[0]}>
-                          {f[0].toUpperCase()}
-                        </span>
-                        <div>
-                          <b>
-                            {f[1]}
-                            {f[4] && <span className="verified">verified</span>}
-                          </b>
-                          <span className="why">{f[2]}</span>
-                          {f[3] > 0 && <em>+{f[3]} pts</em>}
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                  <div className="result-foot">
-                    <button className="btn" onClick={reset}>Scan another site</button>
-                    <p className="fineprint">
-                      {live
-                        ? fromCache
-                          ? "This site was scanned in the last hour, so these are those results. Fix points are estimates."
-                          : "Live results from three TinyFish agents. Fix points are estimates."
-                        : "Sample results: live scans are not set up on this server yet."}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {revealed && result && <Report result={result} host={host} fromCache={fromCache} onReset={reset} />}
             </motion.div>
           )}
         </AnimatePresence>
