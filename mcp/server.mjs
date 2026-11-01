@@ -53,6 +53,13 @@ server.registerTool(
     if (!target) return fail("That is not a valid address. Try example.com or localhost:3000.");
     try {
       const checks = await runChecks(target.toString(), type);
+      // A page that did not load has no real score; saying so beats a number that looks like a result.
+      const notLoaded = checks.find((c) => c.id === "fetch");
+      if (notLoaded) {
+        return fail(
+          `Could not load ${target.host}: ${notLoaded.detail}. ${isLocalHost(target.hostname) ? "Is your dev server running on that port?" : "Is the address right, and is the site up?"} No score was given, because most checks cannot run on a page that does not load.`,
+        );
+      }
       const report = checkReport(target.toString(), type, checks);
       const failed = report.checks.filter((c) => c.applicable && !c.passed).length;
       return text({
