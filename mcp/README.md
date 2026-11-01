@@ -59,3 +59,7 @@ Claude: copy `skill/SKILL.md` to `~/.claude/skills/axolotl/SKILL.md`. Other tool
 - `axolotl_scan` runs on the caller's TinyFish account, so it skips the website's scan limits and isn't cached for other visitors. Agents should run `axolotl_check` first.
 - `axolotl_check` has its own limit (`CHECK_LIMIT_PER_HOUR`, default 30 per address).
 - `skill/SKILL.md` is a Claude skill that tells an agent when to use these tools and how to read the results.
+
+## Status
+
+Paused for now: it works for the free `axolotl_check`, but the full `axolotl_scan` through it has not been proven end to end yet.
