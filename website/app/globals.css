@@ -2345,3 +2345,14 @@ select {
 .keybox .hint {
   margin-top: 8px;
 }
+
+.mcp-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.mcp-note code {
+  color: var(--body);
+}

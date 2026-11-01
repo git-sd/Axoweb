@@ -6,31 +6,24 @@
 import { useState } from "react";
 import { ICONS } from "@/lib/brand-icons";
 
-const URL_PLACEHOLDER = "https://your-axolotl.app";
-const SERVER = "/path/to/axolotl/mcp/server.mjs";
+const SERVER = "/path/to/Axoweb/mcp/server.mjs";
 
 const json = (key: "mcpServers" | "servers", extra = "") => `{
   "${key}": {
     "axolotl": {${extra}
       "command": "node",
-      "args": ["${SERVER}"],
-      "env": {
-        "AXOLOTL_URL": "${URL_PLACEHOLDER}",
-        "TINYFISH_API_KEY": "your-tinyfish-key"
-      }
+      "args": ["${SERVER}"]
     }
   }
 }`;
 
+// Setup needs no keys: the free check runs on your own machine. Full scans add two variables.
 const CLIENTS: { name: string; icon: string; where: string; code: string }[] = [
   {
     name: "Claude Code",
     icon: "claude",
     where: "Run in your terminal",
-    code: `claude mcp add axolotl \
-  --env AXOLOTL_URL=${URL_PLACEHOLDER} \
-  --env TINYFISH_API_KEY=your-tinyfish-key \
-  -- node ${SERVER}`,
+    code: `claude mcp add axolotl -- node ${SERVER}`,
   },
   { name: "Claude Desktop", icon: "claude", where: "claude_desktop_config.json", code: json("mcpServers") },
   {
@@ -39,11 +32,7 @@ const CLIENTS: { name: string; icon: string; where: string; code: string }[] = [
     where: "~/.codex/config.toml",
     code: `[mcp_servers.axolotl]
 command = "node"
-args = ["${SERVER}"]
-
-[mcp_servers.axolotl.env]
-AXOLOTL_URL = "${URL_PLACEHOLDER}"
-TINYFISH_API_KEY = "your-tinyfish-key"`,
+args = ["${SERVER}"]`,
   },
   { name: "Cursor", icon: "cursor", where: ".cursor/mcp.json", code: json("mcpServers") },
   { name: "VS Code", icon: "copilot", where: ".vscode/mcp.json (Copilot agent mode)", code: json("servers", '\n      "type": "stdio",') },
@@ -52,13 +41,13 @@ TINYFISH_API_KEY = "your-tinyfish-key"`,
 ];
 
 // What to tell a model so it uses the tools well. Goes in CLAUDE.md, AGENTS.md or a rules file.
-const TEACH = `## Axolotl (agent-readiness checks)
-When asked whether a website works for AI agents, or to improve it for them:
-1. Run axolotl_check on the site first. It is free and takes seconds.
-2. Report the score, the four dimension scores and the failed checks with their fixes.
-3. Run axolotl_scan only if the user wants proof that real tasks (checkout, booking, sign-up) work.
-   It takes 3-4 minutes and spends their TinyFish credits, so ask first.
-4. A task marked not scored or not run was left out for lack of time, not counted against the site.`;
+const TEACH = `## Axolotl (can AI agents use this website?)
+When I am building a website, or ask whether it works for AI agents:
+1. Run axolotl_check on the dev address (for example localhost:3000). It is free, instant and works on localhost.
+2. Tell me the score and the failed checks with their fixes, highest severity first.
+3. Apply the fixes I agree to, then run axolotl_check again and tell me what changed.
+4. Run axolotl_scan only if I ask for the full scan. It needs a public address, takes 3-8 minutes and spends my TinyFish credits.
+5. A task marked not scored or not run was left out for lack of time. It does not count against the site.`;
 
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false);
@@ -100,6 +89,9 @@ export default function McpInstall() {
         </div>
         <pre className="mcp-code">{c.code}</pre>
       </div>
+      <p className="mcp-note">
+        No keys are needed for the free check, which also works on localhost. For full scans, add your own TinyFish key as <code>TINYFISH_API_KEY</code> and the address of a running Axolotl as <code>AXOLOTL_URL</code>.
+      </p>
       <div className="mcp-bar mcp-teach-bar">
         <span>Teach your agent when to use it: add to CLAUDE.md, AGENTS.md or your rules file</span>
         <CopyButton text={TEACH} />

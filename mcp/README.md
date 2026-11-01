@@ -1,11 +1,13 @@
 # Axolotl MCP server
 
-Lets an AI agent check how ready a website is for AI agents, using a running Axolotl deployment.
+Lets your coding agent (Claude Code, Codex, Cursor, Gemini CLI, Windsurf, VS Code Copilot) check how well AI agents can use the website you are building, and fix what it finds.
 
-| Tool | Cost | Time | What it does |
+| Tool | Cost | Needs | What it does |
 | --- | --- | --- | --- |
-| `axolotl_check` | Free | Seconds | Runs the 26 site checks and returns a score, per-dimension scores, failed checks and fixes. No agents run. |
-| `axolotl_scan` | Uses your TinyFish credits (about $1) | 3 to 4 minutes | Full scan: TinyFish agents attempt real tasks, plus the checks. Returns the score, task results and ranked fixes. Needs your TinyFish key. |
+| `axolotl_check` | Free, a few seconds | Nothing | Runs the 26 site checks **on your machine** and returns a score, four dimension scores and every failed check with a fix. **Works on `localhost`**, so use it while you build. |
+| `axolotl_scan` | Your TinyFish credits (about $1) | `TINYFISH_API_KEY`, `AXOLOTL_URL`, and a **public** address | Full scan: TinyFish web agents try real tasks (find a product, reach checkout, and so on). Takes 3 to 8 minutes. |
+
+`axolotl_check` reads the page's HTML and root files only, so it cannot prove that a task like checkout works. `axolotl_scan` can, but the agents browse from TinyFish's cloud and cannot reach `localhost`: scan a deployed preview or use a tunnel (`npx localtunnel --port 3000`).
 
 ## Set up
 
@@ -14,26 +16,12 @@ cd mcp
 npm install
 ```
 
-Point it at your Axolotl deployment with `AXOLOTL_URL` (default `http://localhost:3000`). For `axolotl_scan`, also set `TINYFISH_API_KEY` to your own TinyFish key; the scan then runs on your TinyFish account and does not use the deployment's budget. Without a key only `axolotl_check` works. The key is sent to your Axolotl deployment in the `X-TinyFish-Key` header, so only point `AXOLOTL_URL` at a deployment you trust, over https.
+That is all `axolotl_check` needs. The bundled checks are already built (`checks.bundle.mjs`). If you change the checks in `../app/lib`, rebuild with `npm run build`.
 
 **Claude Code**
 
 ```bash
-claude mcp add axolotl --env AXOLOTL_URL=https://your-axolotl.vercel.app --env TINYFISH_API_KEY=your-key -- node /path/to/axolotl/mcp/server.mjs
-```
-
-**Claude desktop, Cursor and others** (`mcpServers` in the client's config):
-
-```json
-{
-  "mcpServers": {
-    "axolotl": {
-      "command": "node",
-      "args": ["/path/to/axolotl/mcp/server.mjs"],
-      "env": { "AXOLOTL_URL": "https://your-axolotl.vercel.app", "TINYFISH_API_KEY": "your-key" }
-    }
-  }
-}
+claude mcp add axolotl -- node /path/to/Axoweb/mcp/server.mjs
 ```
 
 **Codex** (`~/.codex/config.toml`)
@@ -41,25 +29,39 @@ claude mcp add axolotl --env AXOLOTL_URL=https://your-axolotl.vercel.app --env T
 ```toml
 [mcp_servers.axolotl]
 command = "node"
-args = ["/path/to/axolotl/mcp/server.mjs"]
-
-[mcp_servers.axolotl.env]
-AXOLOTL_URL = "https://your-axolotl.vercel.app"
-TINYFISH_API_KEY = "your-key"
+args = ["/path/to/Axoweb/mcp/server.mjs"]
 ```
 
-**Cursor** (`.cursor/mcp.json`), **Gemini CLI** (`~/.gemini/settings.json`) and **Windsurf** (`~/.codeium/windsurf/mcp_config.json`) use the same `mcpServers` JSON as above. **VS Code** (`.vscode/mcp.json`) uses `"servers"` with `"type": "stdio"` added to the server entry.
+**Claude Desktop, Cursor, Gemini CLI and Windsurf** (`mcpServers` in the tool's config)
 
-## Teach the model when to use it
+```json
+{
+  "mcpServers": {
+    "axolotl": {
+      "command": "node",
+      "args": ["/path/to/Axoweb/mcp/server.mjs"]
+    }
+  }
+}
+```
 
-Claude: copy `skill/SKILL.md` to `~/.claude/skills/axolotl/SKILL.md`. Other tools: paste the instructions from `skill/SKILL.md` into `AGENTS.md`, `GEMINI.md` or your rules file.
+**VS Code** (`.vscode/mcp.json`) uses `"servers"` with `"type": "stdio"` added to the entry.
 
-## Notes
+### For full scans, add two environment variables
 
-- `axolotl_scan` runs on the caller's TinyFish account, so it skips the website's scan limits and isn't cached for other visitors. Agents should run `axolotl_check` first.
-- `axolotl_check` has its own limit (`CHECK_LIMIT_PER_HOUR`, default 30 per address).
-- `skill/SKILL.md` is a Claude skill that tells an agent when to use these tools and how to read the results.
+| Variable | Value |
+| --- | --- |
+| `TINYFISH_API_KEY` | Your own key from [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys). The scan runs on your TinyFish account. |
+| `AXOLOTL_URL` | The address of a running Axolotl website (it drives the agents). The key is sent to that address, so use one you trust, over https. |
 
-## Status
+For Claude Code: `claude mcp add axolotl --env TINYFISH_API_KEY=... --env AXOLOTL_URL=https://... -- node /path/to/Axoweb/mcp/server.mjs`. In JSON configs add an `"env"` object next to `"args"`.
 
-Paused for now: it works for the free `axolotl_check`, but the full `axolotl_scan` through it has not been proven end to end yet.
+## Teach your agent when to use it
+
+Claude: copy `skill/SKILL.md` to `~/.claude/skills/axolotl/SKILL.md`. Other tools: paste the contents of `skill/SKILL.md` (without the top block between the `---` lines) into `AGENTS.md`, `GEMINI.md` or your rules file. The skill describes the build loop: check, fix the highest-severity items, check again.
+
+## Limits to know about
+
+- The score is a diagnostic, not a certification. Agent runs vary by a few points between scans, and a few checks (such as `llms.txt`) are forward-looking.
+- Page speed is measured from your machine, so that one check can vary run to run.
+- Agents never submit forms, pay, book or sign up on the sites they test.

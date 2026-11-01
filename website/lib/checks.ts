@@ -39,6 +39,21 @@ const USEFUL_SCHEMA: Record<string, string[]> = {
 // Link texts that tell an agent (or a screen reader user) nothing about the destination.
 const VAGUE_LINK = new Set(["click here", "here", "read more", "more", "learn more", "link", "this", "click", "details", "continue"]);
 
+// Addresses that only exist on the developer's own machine or network.
+export function isLocalHost(host: string) {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    h === "localhost" ||
+    h.endsWith(".localhost") ||
+    h.endsWith(".local") ||
+    h === "::1" ||
+    /^127\./.test(h) ||
+    /^10\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  );
+}
+
 type Fetched = { status: number; text: string; type: string; ms: number; url: string; headers: Headers };
 
 async function get(url: string): Promise<Fetched | null> {
@@ -415,13 +430,15 @@ export function pageChecks(html: string, type: string, pageUrl: string): Check[]
   });
 
   const https = pageUrl.startsWith("https://");
+  // A page on a developer's own machine is plain HTTP by design, so it is shown but not scored.
+  const local = isLocalHost(new URL(pageUrl).hostname);
   add({
     id: "https",
     label: "Served over HTTPS",
     dim: 3,
-    weight: 2,
-    ok: https,
-    detail: https ? "The page is served over HTTPS" : "The page is served over plain HTTP",
+    weight: local ? 0 : 2,
+    ok: https || local,
+    detail: local ? "A local development address, so HTTPS is not checked" : https ? "The page is served over HTTPS" : "The page is served over plain HTTP",
     why: "Agents and browsers warn about, or refuse, sites that are not served over HTTPS, and forms on them are not safe to fill.",
     severity: "high",
     fix: "Serve the whole site over HTTPS and redirect http:// addresses to https://.",

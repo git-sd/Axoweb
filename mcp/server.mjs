@@ -1,43 +1,67 @@
 #!/usr/bin/env node
-// Axolotl MCP server: lets an agent check a website's agent-readiness over stdio.
-//   axolotl_check  free, seconds: 26 site checks (no TinyFish agents)
-//   axolotl_scan   full scan: TinyFish agents try real tasks (3-4 minutes, uses TinyFish credits)
-// Set AXOLOTL_URL to the address of a running Axolotl deployment, and TINYFISH_API_KEY to your own
-// TinyFish key (axolotl_scan runs on your TinyFish account; axolotl_check needs no key).
+// Axolotl MCP server: lets a coding agent check how ready a website is for AI agents while the
+// site is being built.
+//
+//   axolotl_check  free and instant. Runs the 26 site checks right here on your machine, so it
+//                  works on localhost and on any site, with no server and no key.
+//   axolotl_scan   full scan: TinyFish web agents try real tasks on the site (3-8 minutes, uses
+//                  your TinyFish credits). The agents run in TinyFish's cloud, so the site must
+//                  be reachable from the internet. Needs AXOLOTL_URL and TINYFISH_API_KEY.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { runChecks, checkReport, isLocalHost } from "./checks.bundle.mjs";
 
-const BASE = (process.env.AXOLOTL_URL || "http://localhost:3000").replace(/\/$/, "");
+const BASE = (process.env.AXOLOTL_URL || "").replace(/\/$/, "");
 const KEY = (process.env.TINYFISH_API_KEY || "").trim();
 const TYPES = ["booking", "shop", "saas", "docs", "lead", "custom"];
 
-const server = new McpServer({ name: "axolotl", version: "0.1.0" });
+const server = new McpServer({ name: "axolotl", version: "0.2.0" });
 
 const text = (value) => ({ content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }] });
 const fail = (message) => ({ isError: true, content: [{ type: "text", text: message }] });
 
+// "localhost:3000" and "my-site.dev" both work; local addresses default to http.
+function normalise(raw) {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return null;
+  try {
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `${isLocalHost(trimmed.split(/[/:]/)[0]) ? "http" : "https"}://${trimmed}`;
+    const u = new URL(withScheme);
+    return /^https?:$/.test(u.protocol) ? u : null;
+  } catch {
+    return null;
+  }
+}
+
 const input = {
-  url: z.string().describe("Public address of the site, e.g. example.com"),
-  type: z.enum(TYPES).default("custom").describe("booking, shop, saas, docs, lead (lead-gen forms) or custom"),
+  url: z.string().describe("Address of the site: a public address like example.com, or a local one like localhost:3000"),
+  type: z.enum(TYPES).default("custom").describe("What kind of site: booking, shop, saas, docs, lead (lead-gen forms) or custom"),
 };
 
 server.registerTool(
   "axolotl_check",
   {
-    title: "Check a site for agent-readiness (free)",
+    title: "Check a site for agent-readiness (free, works on localhost)",
     description:
-      "Runs Axolotl's 26 site checks (structured data, headings, labels, robots.txt, sitemap, llms.txt, speed, CAPTCHAs and more) and returns a score out of 100 with failed checks and fixes. Takes seconds and uses no TinyFish credits. Does not run agents, so it cannot say whether a task like checkout actually works.",
+      "Runs Axolotl's 26 site checks (structured data, headings, form labels, link text, buttons, CAPTCHAs, robots.txt, sitemap, llms.txt, page speed and more) from this machine and returns a score out of 100, four dimension scores, and every failed check with a specific fix. Free and takes a few seconds. Works on localhost and private addresses, so use it while building: run it, apply the fixes, run it again. It reads the page's HTML and root files only; it does not run agents, so it cannot prove a task such as checkout actually works.",
     inputSchema: input,
   },
   async ({ url, type }) => {
+    const target = normalise(url);
+    if (!target) return fail("That is not a valid address. Try example.com or localhost:3000.");
     try {
-      const res = await fetch(`${BASE}/api/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, type }), signal: AbortSignal.timeout(60_000) });
-      const data = await res.json().catch(() => ({}));
-      return res.ok ? text(data) : fail(data.error || `Axolotl returned ${res.status}`);
+      const checks = await runChecks(target.toString(), type);
+      const report = checkReport(target.toString(), type, checks);
+      const failed = report.checks.filter((c) => c.applicable && !c.passed).length;
+      return text({
+        ...report,
+        summary: `${report.score}/100 for ${target.host}: ${failed} of ${report.checks.filter((c) => c.applicable).length} applicable checks failed.`,
+        ran: isLocalHost(target.hostname) ? "locally, on your machine" : "from your machine",
+      });
     } catch (e) {
-      return fail(`Could not reach Axolotl at ${BASE}: ${e.message}`);
+      return fail(`The checks could not run: ${e.message}`);
     }
   },
 );
@@ -45,18 +69,31 @@ server.registerTool(
 server.registerTool(
   "axolotl_scan",
   {
-    title: "Full agent-experience scan (uses credits)",
+    title: "Full agent-experience scan (uses your TinyFish credits)",
     description:
-      "Sends real TinyFish web agents to the site to attempt tasks that matter for its type (find a product, reach checkout, and so on) plus the 26 site checks. Returns the score, grade-ready dimension scores, per-task results and ranked fixes. Takes 3-4 minutes and spends the user's own TinyFish credits (roughly $1; needs TINYFISH_API_KEY set in this server's environment), so use axolotl_check first and only run this when the user wants the full scan. The agents never submit, pay or sign up.",
+      "Sends real TinyFish web agents to the site to attempt the tasks that matter for its type (find a product, reach checkout, and so on), plus the 26 site checks. Returns the score, per-task results with what each agent saw, and ranked fixes. Takes 3 to 8 minutes and costs roughly $1 in the user's own TinyFish credits, so run axolotl_check first and only run this when the user asks for the full scan. The agents browse from TinyFish's cloud, so the site must be reachable from the internet: localhost will not work (use a deployed preview or a tunnel). Needs AXOLOTL_URL and TINYFISH_API_KEY. The agents never submit, pay or sign up.",
     inputSchema: { ...input, description: z.string().optional().describe("For type=custom: what the site is and what visitors should be able to do") },
   },
   async ({ url, type, description }) => {
-    if (!KEY) return fail("axolotl_scan needs your TinyFish key. Set TINYFISH_API_KEY in this MCP server's environment (get one at tinyfish.ai), then restart it. axolotl_check works without a key.");
+    const target = normalise(url);
+    if (!target) return fail("That is not a valid address. Try example.com.");
+    if (isLocalHost(target.hostname)) {
+      return fail(
+        `${target.host} only exists on this machine, and the agents browse from TinyFish's cloud, so they cannot reach it. Expose it first with a deployed preview (Vercel, Netlify) or a tunnel (npx localtunnel --port 3000, or cloudflared tunnel --url ${target.origin}), then scan that public address. axolotl_check works on localhost without any of this.`,
+      );
+    }
+    if (!KEY) return fail("axolotl_scan needs your TinyFish key. Set TINYFISH_API_KEY in this MCP server's environment (get one at agent.tinyfish.ai/api-keys) and restart it. axolotl_check works without a key.");
+    if (!BASE) return fail("axolotl_scan needs a running Axolotl to drive the agents. Set AXOLOTL_URL in this MCP server's environment to your Axolotl website's address, and restart it. axolotl_check works without it.");
     try {
-      const res = await fetch(`${BASE}/api/scan`, { method: "POST", headers: { "Content-Type": "application/json", "X-TinyFish-Key": KEY }, body: JSON.stringify({ url, type, description }), signal: AbortSignal.timeout(720_000) });
+      const res = await fetch(`${BASE}/api/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-TinyFish-Key": KEY },
+        body: JSON.stringify({ url: target.toString(), type, description }),
+        signal: AbortSignal.timeout(720_000),
+      });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        return fail(data.error || `Axolotl returned ${res.status}`);
+        return fail(data.error || `Axolotl at ${BASE} returned ${res.status}`);
       }
       const decoder = new TextDecoder();
       let buffer = "";
@@ -77,7 +114,7 @@ server.registerTool(
       if (result) return text({ cached: !!result.cached, ...result.result });
       return fail(error || "The scan ended without a result.");
     } catch (e) {
-      return fail(`Scan failed: ${e.message}`);
+      return fail(`The scan failed: ${e.message}. Is AXOLOTL_URL (${BASE}) reachable?`);
     }
   },
 );

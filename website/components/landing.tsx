@@ -616,7 +616,7 @@ function ForAgents() {
             </p>
             <ul>
               <li>
-                <b>axolotl_check</b> is free and takes seconds. It runs the 26 site checks and returns a score with fixes.
+                <b>axolotl_check</b> is free and takes seconds. It runs the 26 site checks on your machine, so it works on localhost while you build.
               </li>
               <li>
                 <b>axolotl_scan</b> sends TinyFish agents to try real tasks. It runs on your own TinyFish key.
