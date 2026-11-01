@@ -2033,3 +2033,33 @@ textarea.field {
 .loading-axolotl {
   margin: 0 auto 28px;
 }
+
+/* No text cursor or click-selection on the interface; form fields and the report text still work. */
+body {
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea {
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+a,
+button,
+summary,
+label,
+select {
+  cursor: pointer;
+}
+
+.rp-body,
+.rp-lede {
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
