@@ -17,13 +17,13 @@ const GILLS = [
   { x: 182, y: 120, a: 18, len: 56 },
 ];
 
-function Gill({ len, i, excited }: { len: number; i: number; excited: boolean }) {
+function Gill({ len, i, excited, calm }: { len: number; i: number; excited: boolean; calm: boolean }) {
   const frills = Array.from({ length: 5 }, (_, k) => 10 + k * ((len - 14) / 4));
   return (
     <motion.g
       style={{ originX: 0, originY: 0.5 }}
-      animate={{ rotate: excited ? [0, 16, -10, 12, 0] : [0, 7, 0, -5, 0] }}
-      transition={{ duration: excited ? 0.7 : 2.4, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
+      animate={{ rotate: excited ? [0, 16, -10, 12, 0] : calm ? [0, 2.5, 0, -2, 0] : [0, 7, 0, -5, 0] }}
+      transition={{ duration: excited ? 0.7 : calm ? 5 : 2.4, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
     >
       {frills.map((fx) => (
         <g key={fx} stroke={INK} strokeWidth="9" strokeLinecap="round">
@@ -43,8 +43,9 @@ function Gill({ len, i, excited }: { len: number; i: number; excited: boolean })
 }
 
 // A front-facing axolotl that bobs, blinks, waves its gills and watches the cursor.
-// `excited` speeds the gills up and adds a hop (e.g. while the URL box has focus).
-export default function Axolotl({ excited = false, size = 220 }: { excited?: boolean; size?: number }) {
+// `excited` speeds the gills up and adds a hop (e.g. while the URL box has focus). `calm` does the
+// opposite: a slow, barely-there sway for screens where something else needs the attention.
+export default function Axolotl({ excited = false, calm = false, size = 220 }: { excited?: boolean; calm?: boolean; size?: number }) {
   const ref = useRef<SVGSVGElement>(null);
   const px = useSpring(useMotionValue(0), { stiffness: 220, damping: 14 });
   const py = useSpring(useMotionValue(0), { stiffness: 220, damping: 14 });
@@ -83,8 +84,8 @@ export default function Axolotl({ excited = false, size = 220 }: { excited?: boo
       height={(size * 220) / 300}
       role="img"
       aria-label="A pink axolotl waving its gills"
-      animate={excited ? { y: [0, -14, 0] } : { y: [0, -8, 0] }}
-      transition={{ duration: excited ? 0.6 : 3, repeat: Infinity, ease: "easeInOut" }}
+      animate={excited ? { y: [0, -14, 0] } : calm ? { y: [0, -2, 0] } : { y: [0, -8, 0] }}
+      transition={{ duration: excited ? 0.6 : calm ? 6 : 3, repeat: Infinity, ease: "easeInOut" }}
       style={{ overflow: "visible", display: "block", margin: "0 auto" }}
     >
       {/* tail, tucked behind */}
@@ -93,18 +94,18 @@ export default function Axolotl({ excited = false, size = 220 }: { excited?: boo
         fill={BODY}
         {...LINE}
         style={{ originX: 0, originY: 0.5 }}
-        animate={{ rotate: [0, -6, 0, 4, 0] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ rotate: calm ? [0, -2, 0, 2, 0] : [0, -6, 0, 4, 0] }}
+        transition={{ duration: calm ? 5 : 2.8, repeat: Infinity, ease: "easeInOut" }}
       />
       {/* gills: right side, then mirrored left */}
       {GILLS.map((g, i) => (
         <g key={`r${i}`} transform={`translate(${g.x} ${g.y}) rotate(${g.a})`}>
-          <Gill len={g.len} i={i} excited={excited} />
+          <Gill len={g.len} i={i} excited={excited} calm={calm} />
         </g>
       ))}
       {GILLS.map((g, i) => (
         <g key={`l${i}`} transform={`translate(${300 - g.x} ${g.y}) rotate(${180 - g.a})`}>
-          <Gill len={g.len} i={i + 3} excited={excited} />
+          <Gill len={g.len} i={i + 3} excited={excited} calm={calm} />
         </g>
       ))}
       {/* front legs */}

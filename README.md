@@ -26,11 +26,12 @@ Set these in `.env.local` locally, or in your host's environment variables (Verc
 | `SCAN_DAILY_BUDGET` | `20` | Scans everyone together can start per day |
 | `SCAN_MAX_CONCURRENT` | `3` | Scans running at the same time |
 | `SCAN_CACHE_MINUTES` | `60` | Re-scanning the same site within this window reuses the result |
-| `SCAN_AGENT_CONCURRENCY` | `6` | Agents started at once within one scan |
+| `SCAN_AGENT_CONCURRENCY` | `2` | Agents running at once within one scan (TinyFish allows 2 per run on the standard plan) |
 | `SCAN_AGENT_SECONDS` | `230` | The longest one agent may work before it is stopped |
 | `SCAN_TOTAL_SECONDS` | `270` | Time budget for the whole scan (Vercel free plan allows 300) |
+| `SCAN_MIN_AGENT_SECONDS` | `110` | The least time worth giving an agent; with the settings above this fits 4 of the 6 tasks, the most important first |
 
-Setting any of the first three limits to `0` pauses live scans. A scan takes about three to five minutes and uses roughly 60 to 120 TinyFish agent steps (about $1 to $2).
+Setting any of the first three limits to `0` pauses live scans. A scan takes about three to four minutes and uses roughly 40 to 80 TinyFish agent steps (about $0.70 to $1.30). Two agents run at a time, and only as many tasks as fit the time are run, most important first; the rest are marked "not run" and left out of the score.
 
 The limits are kept in server memory, so on hosts that run several instances (such as Vercel) each instance counts separately.
 

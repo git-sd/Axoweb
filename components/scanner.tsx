@@ -8,6 +8,7 @@ import TinyfishLogo from "@/components/tinyfish-logo";
 import AxolotlMark from "@/components/axolotl-mark";
 import { GithubIcon } from "@/components/github-link";
 import TypeArt from "@/components/type-art";
+import Axolotl from "@/components/axolotl";
 import Report from "@/components/report";
 import { GITHUB_URL } from "@/lib/links";
 import { PRESETS, SITES, detect, total, verdictOf } from "@/lib/sites";
@@ -15,7 +16,7 @@ import { tasksFor, type ScanResult } from "@/lib/scan";
 import type { ScanEvent } from "@/app/api/scan/route";
 
 type Phase = "pick" | "address" | "loading" | "results";
-type TaskState = "idle" | "queued" | "run" | "pass" | "fail";
+type TaskState = "idle" | "queued" | "skip" | "run" | "pass" | "fail";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -122,7 +123,7 @@ export default function Scanner() {
     setStates(tasks.map(() => "queued"));
     setSteps(tasks.map(() => ""));
     setChecks(null);
-    setStatus(`Sending 6 agents to ${h}…`);
+    setStatus(`Sending agents to ${h}…`);
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
@@ -156,6 +157,8 @@ export default function Scanner() {
             setStatus(e.text);
           } else if (e.type === "checks") {
             setChecks(e.checks);
+          } else if (e.type === "skipped") {
+            setStates((s) => s.map((v, j) => (j === e.task ? "skip" : v)));
           } else if (e.type === "started") {
             setStates((s) => s.map((v, j) => (j === e.task && v === "queued" ? "run" : v)));
           } else if (e.type === "task") {
@@ -329,27 +332,14 @@ export default function Scanner() {
                 <button className="btn-quiet" onClick={() => setPhase("pick")}>← Back</button>
                 <button className="btn" onClick={submit}>Run scan</button>
               </div>
-              <p className="fineprint">Six TinyFish agents will each try a real task on this site, and 26 checks will read its files. A scan takes about three to five minutes. The agents never submit, pay, book or sign up.</p>
+              <p className="fineprint">TinyFish agents will try real tasks on this site, two at a time, and 26 checks will read its files. A scan takes about three to four minutes. The agents never submit, pay, book or sign up.</p>
             </motion.div>
           )}
 
           {phase === "loading" && (
             <motion.div key="loading" {...phaseMotion}>
-              <div className="pulse">
-                {[0, 1, 2].map((i) => (
-                  <motion.span
-                    key={i}
-                    className="ring-wave"
-                    initial={{ scale: 0.35, opacity: 0.9 }}
-                    animate={{ scale: 1.15, opacity: 0 }}
-                    transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.8, ease: "easeOut" }}
-                  />
-                ))}
-                <motion.span
-                  className="core"
-                  animate={{ scale: [1, 1.25, 0.9, 1.1, 1] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                />
+              <div className="loading-axolotl">
+                <Axolotl calm size={230} />
               </div>
               <h2>Sending agents to your site</h2>
               <AnimatePresence mode="wait">
@@ -388,6 +378,7 @@ export default function Scanner() {
                       <span className="check-text">
                         {title}
                         {live && st === "queued" && <small>Waiting for its turn</small>}
+                        {live && st === "skip" && <small>Not run: this server only has time for the main tasks</small>}
                         {live && st === "run" && steps[i] && <small>{steps[i]}</small>}
                       </span>
                     </motion.div>
